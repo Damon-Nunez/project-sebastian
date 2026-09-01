@@ -1,0 +1,201 @@
+﻿Project: Sebastian — Teacher Workload Assistant (v2)
+One-liner
+A simple web tool that helps teachers cut down time spent grading essays/short-answer work and building daily lesson plans — with AI drafting suggestions they review and approve, never auto-submits.
+Target user
+Primary pilot: a middle school English/Social Studies teacher (multiple sections of the same subject). Product goal: a **universal tool** many teachers can use — different lessons, subjects, grade bands, and districts — not a one-off built for a single person.
+The core insight (unchanged, now sharper)
+The school pushes Kiddom for AI grading, but it's a black box — swayed by writing style, and gives a single concrete grade even though the AI itself is uncertain. Two ways this tool beats that:
+
+
+1. AI drafts, she decides — nothing is final until she approves it.
+2. Grade RANGES, not fake precision — the AI suggests a tight range (4–5 point spread, e.g., 80–85) instead of a single number. She narrows it based on what she knows about the student. This is honest about AI uncertainty instead of hiding it, and directly solves the problem she has with Kiddom overstating its own confidence.
+
+
+________________
+
+
+Scope
+Foundational (not a "phase" — this is the data model from day one)
+* Multi-section support: same subject, multiple class periods/sections (e.g., 1st period, 3rd period), each with its own roster
+* Rubrics are flexible per section: default is one rubric shared across all sections for a given assignment, but she can override/customize per section via a simple "edit rubric for this section" action — not locked into one or the other
+* Student profiles per class: name, and optionally teacher-entered notes (e.g., accommodations/disability-related context) that she controls
+* AI grading factors in student notes when present — but the AI does not interpret what a disability means for grading on its own. It surfaces the note ("This student has a documented accommodation for X — consider adjusting expectations accordingly") and flags the suggestion as adjusted, but the actual judgment call stays with her, since she knows the kid. The AI never silently changes a grade based on this — it's always visible and reviewable.
+Setup phase (V1 requirement — first-time use)
+Two stages:
+
+
+1. Roster setup
+
+
+* Create her sections/periods (e.g., 1st period, 3rd period — same subject)
+* Add students to each section's roster (name at minimum)
+* Optionally add per-student notes (accommodations/disability-related context) — she controls what's entered, entirely optional
+* This roster data is what powers auto-matching documents to students later, and is the source of truth the sanitizer (below) uses to know what to redact
+
+
+2. Rubric & unit setup Rubrics are universal across all sections (same curriculum, same periods learning the same content) — student-specific filters/notes still apply at grading time regardless of which rubric is used.
+
+
+* General HW rubric: one reusable default rubric for daily homework/classwork grading, with adjustable category weights (e.g., content vs. mechanics)
+* General short-response rubric: one reusable default for short-answer work, same filter/weight support
+* Essay rubrics are unit-exclusive: essay rubrics are tied to essay type (narrative, persuasive, expository, etc.), and each unit gets its own — e.g., Unit 3 might teach narrative essays and uses the narrative rubric; Unit 4 might teach persuasive and uses a different one
+* Setup flow: she creates a unit, assigns it an essay type + rubric, and that rubric applies whenever grading essay work for that unit, across every section
+Platform
+Web app. Desktop-first (Windows/Mac browser) — that's where she'll actually use it, grading at a desk. Mobile-responsive is a nice-to-have, not a V1 requirement.
+In scope (V1 / MVP)
+1. Grading Assistant
+
+
+* Input: upload the document (not copy/paste) — the tool reads file metadata/content to identify student name and match to the right class/roster automatically; if match fails, teacher manually selects class + student from dropdowns
+* Rubric selection: teacher picks assignment type via dropdown (HW / short-response / essay) — drives logging and which rubric applies; can override if needed
+* AI generates a suggested grade range (4–5 points wide) + written feedback comments, grounded in the applicable rubric
+* If the student has notes on file, the suggestion visibly flags that context was considered — final interpretation is hers
+* She reviews and edits everything — grade and comments — before it's "final" in the tool
+* Output: see "Export flow" below — this needed its own thinking, details in that section
+
+
+2. Lesson Planning Assistant
+
+* **Data-driven, not hard-coded**: Teacher uploads the district's base lesson plan. The app pre-fills the repetitive "formula" sections that are always copied from district docs, eliminating that manual copy work. The teacher then reviews/edits the pre-filled content and adds class-specific inputs (groups, free-text asks, etc.) before final generation. Phase 0 sample docs are calibration data, not the only supported format.
+* Structure: every lesson follows one general skeleton — Entry Ticket → Work Time (A, B, C...) → Exit Ticket — but the number of Work Time blocks varies per lesson (some have one, some have three). The generator needs to flex block count per lesson, not assume a fixed shape
+* Content source: the district framework doc for that specific lesson (varies per lesson, as established)
+* Grouping/differentiation (important — flagged as a distinct input, not an afterthought):
+   * Temporary, per-lesson pairings/groups — not a permanent label or tier. E.g., "Student X talks to Student Y for this question," or a quick Group A/B/C split for one activity like turn-and-talk. Set fresh each time she builds a lesson, not stored as a lasting student attribute
+   * Work Time blocks and questions can differ by group for that lesson (e.g., a modified question for one pairing/group)
+   * This needs to be a first-class input in the generation flow, not just buried in free text — but it's lightweight: pick students, assign to a quick group/pair for this lesson only
+* Free-text prompt box for her specific asks that don't fit structured fields — e.g., "give the low-level group this question instead," "have this specific student answer X" — sits alongside the structured inputs, not instead of them
+* Input flow overall: upload framework doc → set groups (who's in A/B/C) → structured fields (date, section, number of work-time blocks if it varies from default) → free-text asks → generate
+* AI drafts a filled-out lesson plan matching the Entry/Work Time(s)/Exit structure, incorporating groups and her specific asks
+* She can iterate with follow-up prompts before finalizing
+* Output destination: saves directly to her Google Drive, one file at a time for V1 — she needs it there so she can email it to principals. Uses Google Drive's real API (not a scraped/hacky integration), so it's a legitimate V1 feature rather than a Phase 3 stretch. A folder/location picker popup is a fast-follow, not required for the first version — V1 just needs to land it in her Drive reliably
+* Supports reference links (e.g., YouTube videos) inside the generated plan, since she may want to attach video/resource links for a lesson — the AI draft and the editor both need to preserve/allow links, not just plain text
+* Speed matters more here than anywhere else in the app — she wants to move through lessons quickly (e.g., batch through several during summer prep, or same-day/night-before during the school year) rather than spend real time per lesson. Worth designing the review/edit step to be fast — light-touch approve-and-move-on, not a heavy editor
+Export flow — decided approach for V1
+Since this is a standalone web tool (not integrated into Jupiter or Kiddom), full automation isn't possible in V1. The realistic V1 flow:
+
+
+* Per-student: a "copy comment" button for the written feedback, and the grade shown clearly next to it — she pastes into Jupiter manually, but skips all the composing/re-reading time
+* Per-class summary view: a table of all students in a class with grade + comment, so she can work through an entire class in one sitten sitting instead of hunting through the tool one student at a time
+* This still requires manual entry into Jupiter in V1 — the win is eliminating grading/writing time, not eliminating data entry time. Data entry automation is a Phase 2/3 goal (see below), not V1, since it's a much bigger technical lift (browser automation against a site you don't control).
+Explicitly out of scope (V1)
+* Direct Jupiter integration/sync
+* Full automation of grade/comment submission
+* Report card comment code automation
+* A student-facing side of the platform (students submit through Kiddom, not through this tool) — this would turn the project into a full platform, which is a much bigger scope than "help my mom." Worth keeping in mind as a possible future direction, not now.
+
+
+________________
+
+
+Required test/reference documents (needed before and during build)
+Concrete checklist — the project can't be built accurately without these, since so much of the value is matching her actual format and standards, not a generic AI default.
+
+
+* Example filled-in lesson plans (several, ideally covering a lesson with just one Work Time block and one with multiple) — shows real formatting, tone, and how she structures grouping/differentiation in practice
+* A few district framework docs for specific lessons — shows what raw content the tool is working from
+* HW rubric (general/default)
+* Short-response rubric (general/default)
+* At least one essay rubric, labeled with its essay type (e.g., narrative)
+* 3–5 real graded essays/short answers, already graded by her — calibration data so the AI's grading matches her actual standard (especially so grammar/mechanics isn't over-weighted vs. content)
+* Report card comment code list (e.g., 2117, 2226, 2739...) — for the Phase 3 stretch goal, but useful to have on hand early
+* A rough sense of how she currently defines/labels student groups (e.g., is "Group A" a fixed thing across the year, or does it change per lesson/unit?) — resolved: temporary, per-lesson pairings only (e.g., turn-and-talk), not a persistent roster attribute
+
+
+________________
+
+
+Roadmap
+Phase 0 — Discovery (before writing code)
+* Get her actual district framework docs for a few sample lessons
+* Get her existing HW rubric, short-response rubric, and at least one essay rubric (with essay type) as real test cases
+* Get 3–5 real graded essays/short answers + the rubric she used → calibration data so grammar/mechanics isn't over-weighted
+* Get her report card comment code list (e.g., 2117, 2226, 2739...) for future reference
+* Confirm data handling approach for student names + any disability/accommodation notes (see Technical Requirement below)
+Phase 1 — MVP, Part A: Lesson Planning (build first — highest daily time cost)
+* Multi-section setup (periods, rosters)
+* Google Drive API integration — real API, straightforward, not a scraping hack. Finished plans save directly to a Drive folder she can access/share
+* Lesson Planning Assistant: per-lesson framework doc upload → minimal fields + free text → AI draft → fast iterate/approve → auto-save to Drive
+* Designed for speed — she needs to move through many lessons quickly (summer batch prep + daily use), so the review step should be lightweight, not a heavy editor
+* This ships as a usable tool on its own before grading is built
+Phase 1 — MVP, Part B: Grading
+* Grading Assistant covering both: exams/essays (Docs-based) and daily homework/classwork — same rubric + range approach, calibrated to be fast enough for daily volume
+* Doc upload → auto-match student/class → rubric-based suggested grade range (4-5 pts) + feedback → edit → copy/export per student and per class
+* Rubric calibrated against her real graded samples (Phase 0) so grammar/punctuation isn't over-weighted relative to content — rubric supports adjustable category weights (e.g., content vs. mechanics) rather than a flat AI default
+Phase 2 — Refinement
+* Class-summary workflows refined based on real usage
+* Saved rubric library, reusable across assignments/classes
+* Lesson plan history, "continue from last lesson" context
+* Grade-range-based grading applied to her online HW workflow too (once paper HW moves to Kiddom's online submission, the same "range not a single number" approach can counter Kiddom's overconfident single-grade output — worth revisiting once she's using that platform regularly)
+* AI-usage detection: flagged as worth exploring, but scoped carefully. AI-detection tools have real, documented reliability problems (false positives especially against non-native speakers and plain writing styles) — a confident-sounding percentage she might over-trust could do more harm than good. If built, this should be a soft "worth a second look" flag, not a hard score, and framed to her as an uncertain signal, not a verdict.
+Phase 3 — Stretch / automation goals (bigger technical lift, evaluate after V1/V2 prove valuable)
+* Chrome extension for Jupiter: reads the current student/assignment context on the page, pre-fills the grade + comment into the input box, but requires her to hit "submit" herself (human review preserved, just removes manual re-typing). Flagging now: this is fragile — it depends on Jupiter's page structure and could break if the school changes their system. Worth prototyping small before committing.
+* Report card comment code suggester: given her code list (e.g., 2117 = "good at X"), suggest which 2 codes best fit a student based on the grading/feedback history in the tool. Automating the actual entry into the school site would need the same kind of page-reading approach as the Jupiter idea — same fragility caveat applies.
+
+
+________________
+
+
+User Stories
+Grading Assistant
+* As a teacher, I want to upload a document and have the tool figure out which student and class it belongs to, so I don't have to manually select modes or re-enter context every time.
+* As a teacher, I want the right rubric applied automatically based on what kind of work it is (HW, short answer, or essay type for the unit), so I'm not re-selecting rubrics constantly.
+* As a teacher, I want the same essay rubric to apply across all my sections automatically, since every section learns the same unit content.
+* As a teacher, I want the AI to suggest a grade range instead of one number, so I can use my own judgment of the student to land on the right final grade instead of anchoring on a false-precision AI score.
+* As a teacher, I want to add notes about a specific student (e.g., an accommodation) so the AI's suggestion accounts for context I already know — but I want to be the one who decides how that context affects the grade.
+* As a teacher, I want to edit any AI-suggested feedback or grade before it's final, so I stay in full control of what goes to a student.
+* As a teacher, I want a class-wide summary view of grades/comments so I can process a whole class efficiently instead of one student at a time.
+* As a teacher, I want to quickly copy a finished comment so I can paste it into Jupiter without retyping.
+Lesson Planning Assistant
+* As a teacher, I want to upload that day's district framework doc and get a filled-out draft plan so I don't build it from scratch every time.
+* As a teacher, I want the plan to follow my Entry Ticket / Work Time / Exit Ticket structure, flexing to however many Work Time blocks that lesson actually needs.
+* As a teacher, I want to assign students to groups (A/B/C) and have the plan differentiate work by group, so I don't have to manually rewrite questions for different skill levels every time.
+* As a teacher, I want a free-text box for one-off asks ("give this student that question instead") so I'm not limited to the structured fields when something specific comes up.
+* As a teacher, I want to refine the generated plan with follow-up instructions (not start over) so I can quickly get it exactly right.
+* As a teacher, I want the finished plan to save straight to my Google Drive so I can email it to my principal as proof of plan without extra steps.
+* As a teacher, I want to move through this quickly — for one lesson or a batch of several — so I can get real prep done without it eating my summer or my evenings.
+General
+* As a teacher, I want to manage multiple classes in one place, each with its own roster and rubrics, so the tool matches how my actual day is structured.
+* As a teacher, I want a simple, uncluttered interface so I'm not spending time learning new software instead of saving time.
+
+
+________________
+
+
+Technical requirement: Data privacy architecture (decided)
+Core principle: holding student data is fine. Sending it to a third party is the only thing that needs care.
+
+
+FERPA restricts disclosure of student records to third parties, not a teacher's own possession/storage of data about her own students. Since this tool isn't a school-procured vendor, the framework that matters is simpler than a formal EdTech compliance checklist: the one moment of actual risk is when identifiable student data leaves the app in an API call to a third-party AI model (Claude, OpenAI, etc.) — that's a real disclosure to an outside company's servers. Everything else — the database, the UI, roster management — can hold real names, grades, and even disability/accommodation notes without restriction.
+
+
+Concrete rule to build in:
+
+
+* Database: full real data — names, notes, disability/accommodation context, everything. No anonymization needed here. This is just her data, held by her tool.
+* The sanitizer is local, deterministic code — not an AI, not a "bot that forgets." It's a find-and-replace step that runs before any API call is built:
+   1. The roster (real names) already lives in the local database — no need to ask anything to know what to redact
+   2. Before sending a document/prompt to the AI, local code scans the text and swaps known student names for a placeholder (e.g., "Jamie Smith" → "[Student]") using plain string matching against the roster — no model involved in this step
+   3. Only the sanitized version is ever transmitted in the API call
+   4. The AI's response uses the placeholder; the app swaps the real name back in locally, for display only — the AI never receives it, so there's nothing to "forget"
+   5. Matching an uploaded document to which student it belongs to (via filename/metadata/text pattern) also happens locally against the known roster — not by sending the raw doc to an AI to ask "whose is this"
+* This is a single, isolatable piece of code (the "sanitizer") — not a redesign of the whole app. Worth building and testing this piece early since every AI-facing feature routes through it.
+Technical stack (decided)
+* Hosting: Vercel
+* Database: Supabase (Postgres)
+* AI: Claude Sonnet via Anthropic API
+* AI access: Option B — thin `getAiClient(teacherId)` abstraction; app API key in Vercel env for MVP; nullable per-teacher key column for future teacher-paid/BYOK
+* MVP API cost: developer pays; future: teacher pays
+* Sanitizer runs locally before every external AI call (unchanged)
+
+Open questions for next conversation
+* Supported upload file formats for V1 (.docx, PDF, Google Doc export?)
+* Grade scale: 0–100 only, or points/letter grades per rubric?
+* Get the actual lesson template + report card code list from her when possible — these directly shape what gets built.
+* See sebastianRoadMap.md for ticket breakdown, locked decisions, and MVP gap checklist.
+
+Decisions locked in (MVP)
+* One login, one teacher account
+* Lesson flow: upload district base plan → pre-fill formula sections → teacher modifies + class-specific inputs → generate
+* Grading fallback: manual class + student picker when auto-match fails
+* Assignment type: teacher dropdown (HW / short-response / essay)
+* Full MVP scope — no cuts needed for timeline
