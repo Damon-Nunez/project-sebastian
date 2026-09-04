@@ -21,13 +21,16 @@ export default function Home() {
             <li>Next.js + TypeScript + Tailwind</li>
             <li>Desktop app shell</li>
             <li>Env validation layer</li>
-            <li className="font-medium text-amber-700">Next: Supabase setup (0.4)</li>
+            <li>Supabase server client (0.4)</li>
+            <li>getAiClient Option B (0.5)</li>
+            <li>Smoke health route (0.6)</li>
+            <li className="font-medium text-amber-700">Next: Vercel env + deploy check (0.7)</li>
           </ul>
         </article>
         <article className="rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-slate-900">Stack (locked)</h2>
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>Vercel hosting (deploy paused until after 0.4)</li>
+            <li>Vercel hosting (env wiring next)</li>
             <li>Supabase Postgres</li>
             <li>Claude Sonnet via getAiClient</li>
           </ul>
