@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { getAiClient } from "@/lib/ai/getAiClient";
 import { isAnthropicConfigured } from "@/lib/env";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+
+function publicMessage(err: unknown, fallback: string): string {
+  if (process.env.NODE_ENV !== "production" && err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+}
 
 export async function GET() {
   const result: {
@@ -17,14 +24,14 @@ export async function GET() {
   };
 
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createAdminSupabaseClient();
     const { error, count } = await supabase
       .from("teachers")
       .select("*", { count: "exact", head: true });
 
     if (error) {
       result.db = "error";
-      result.message = error.message;
+      result.message = publicMessage(error, "Database check failed");
       return NextResponse.json(result, { status: 500 });
     }
 
@@ -32,7 +39,7 @@ export async function GET() {
     result.teachersCount = count ?? 0;
   } catch (err) {
     result.db = "error";
-    result.message = err instanceof Error ? err.message : "Unknown DB error";
+    result.message = publicMessage(err, "Database check failed");
     return NextResponse.json(result, { status: 500 });
   }
 
@@ -40,8 +47,7 @@ export async function GET() {
     if (!isAnthropicConfigured()) {
       result.ai = "missing";
       result.ok = false;
-      result.message =
-        "ANTHROPIC_API_KEY not set - add it to .env.local (no paid API call yet)";
+      result.message = "ANTHROPIC_API_KEY not set";
       return NextResponse.json(result, { status: 200 });
     }
 
@@ -52,7 +58,7 @@ export async function GET() {
     return NextResponse.json(result);
   } catch (err) {
     result.ai = "error";
-    result.message = err instanceof Error ? err.message : "Unknown AI error";
+    result.message = publicMessage(err, "AI client check failed");
     return NextResponse.json(result, { status: 500 });
   }
 }

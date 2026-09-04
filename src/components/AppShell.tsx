@@ -1,10 +1,24 @@
 import type { ReactNode } from "react";
+import { SignOutButton } from "@/components/SignOutButton";
+import { createSessionClient } from "@/lib/supabase/server";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
-export function AppShell({ children }: AppShellProps) {
+export async function AppShell({ children }: AppShellProps) {
+  let email: string | null = null;
+
+  try {
+    const supabase = await createSessionClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    email = user?.email ?? null;
+  } catch {
+    // Missing public Supabase env — header stays signed-out.
+  }
+
   return (
     <div className="flex min-h-full flex-col bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
@@ -15,7 +29,11 @@ export function AppShell({ children }: AppShellProps) {
               Teacher Assistant
             </span>
           </div>
-          <span className="text-sm text-slate-500">Desktop workspace</span>
+          {email ? (
+            <SignOutButton email={email} />
+          ) : (
+            <span className="text-sm text-slate-500">Desktop workspace</span>
+          )}
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>

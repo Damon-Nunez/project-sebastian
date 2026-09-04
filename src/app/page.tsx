@@ -9,29 +9,29 @@ export default function Home() {
           Teacher workload assistant
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          Foundation scaffold is running. Lesson planning and grading modules will
-          plug into this desktop-first workspace as tickets land.
+          You are signed in. Lesson planning and grading modules will plug into
+          this desktop-first workspace as tickets land.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <article className="rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-semibold text-slate-900">Ticket 0 status</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Ticket 1 status</h2>
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>Next.js + TypeScript + Tailwind</li>
-            <li>Desktop app shell</li>
-            <li>Env validation layer</li>
-            <li>Supabase server client (0.4)</li>
-            <li>getAiClient Option B (0.5)</li>
-            <li>Smoke health route (0.6)</li>
-            <li className="font-medium text-amber-700">Next: Vercel env + deploy check (0.7)</li>
+            <li>Google OAuth via Supabase Auth</li>
+            <li>Cookie session clients</li>
+            <li>Teacher allowlist (email + domain)</li>
+            <li>teachers.auth_user_id sync on login</li>
+            <li className="font-medium text-amber-700">
+              Next: Ticket 2 — core database schema
+            </li>
           </ul>
         </article>
         <article className="rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-slate-900">Stack (locked)</h2>
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>Vercel hosting (env wiring next)</li>
-            <li>Supabase Postgres</li>
+            <li>Vercel hosting</li>
+            <li>Supabase Postgres + Auth</li>
             <li>Claude Sonnet via getAiClient</li>
           </ul>
         </article>
