@@ -5,9 +5,13 @@ import { requireAnthropicEnv } from "@/lib/env";
 export const DEFAULT_AI_MODEL = "claude-sonnet-4-20250514";
 
 /**
- * Option B AI access: feature code calls this instead of importing the SDK.
+ * Option B AI access: low-level Anthropic client factory.
  * MVP: always uses the app key from ANTHROPIC_API_KEY.
  * Future: if the teacher has api_key_encrypted, use theirs; else app key + usage_tokens.
+ *
+ * Privacy: do **not** call `client.messages.create` with raw student-bearing
+ * text. Use `prepareTextForAi` then `createAiMessage(teacherId, prepared, …)`
+ * from `@/lib/ai/createAiMessage`. Health checks may call this for client init only.
  *
  * @param _teacherId Reserved for future per-teacher BYOK / usage tracking.
  */

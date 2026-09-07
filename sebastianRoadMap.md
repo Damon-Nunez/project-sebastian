@@ -180,6 +180,7 @@ Shared infrastructure every teacher and every AI feature depends on.
 - Google Drive folder picker
 - Grade-range workflow for online HW (e.g. Kiddom) when relevant
 - AI-usage soft-flag only (uncertain signal, not a verdict — per scope caution)
+- **Loading UI for “anonymizing”** — when Grade / Generate kicks off, show a short loading state (e.g. progress/status “Anonymizing…”) while the sanitizer runs before the AI call (stretch; not required for Ticket 3 core)
 
 ---
 
@@ -229,7 +230,7 @@ Shared infrastructure every teacher and every AI feature depends on.
 - **Grade scale** *(Phase 1B)*: Embedded HW rubric is **1–4**, while Jupiter grading in scope is **0–100 ranges**.
 - **Short-response rubric** *(Phase 1B)*: Same 4-point HW/classwork rubric, or a separate one?
 - **Essay rubrics** *(Phase 1B)*: Need the actual table, not just a lesson reference.
-- **Sanitizer edge cases**: Nicknames, first-name-only, duplicate names — how strict for V1?
+- **Sanitizer edge cases**: **Locked (Ticket 3 V1)** — full roster name always; first/last only if unique on roster; no nickname dictionary; duplicate full names → lowest student id wins; doc match from filename/header is local (`matched` / `none` / `ambiguous`).
 - **Batch lesson prep**: One-at-a-time OK for MVP if each lesson is fast?
 
 ---
