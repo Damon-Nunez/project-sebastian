@@ -102,6 +102,63 @@ describe("V1 aliases (identifiers that feed the map)", () => {
     expect(redact("MJ submitted the draft.", map)).toBe("MJ submitted the draft.");
   });
 
+  it("redacts a teacher-entered nickname when present on the roster", () => {
+    const withNick: RosterStudent = {
+      ...maria,
+      nickname: "MJ",
+    };
+    const map = buildNameTokenMap([withNick]);
+    expect(redact("MJ submitted the draft.", map)).toBe(
+      `${tokenForStudentId(maria.id)} submitted the draft.`,
+    );
+  });
+
+  it("does not redact a nickname that duplicates another nickname", () => {
+    const a: RosterStudent = {
+      id: "a",
+      name: "Maria Garcia",
+      nickname: "MJ",
+    };
+    const b: RosterStudent = {
+      id: "b",
+      name: "Jordan Lee",
+      nickname: "MJ",
+    };
+    const map = buildNameTokenMap([a, b]);
+    expect(redact("MJ turned it in.", map)).toBe("MJ turned it in.");
+  });
+
+  it("does not redact a nickname that collides with another student's first name", () => {
+    const jordan: RosterStudent = {
+      id: "stu-jordan",
+      name: "Jordan Lee",
+    };
+    const other: RosterStudent = {
+      id: "stu-other",
+      name: "Sam Rivera",
+      nickname: "Jordan",
+    };
+    const map = buildNameTokenMap([jordan, other]);
+    // Unique first "Jordan" still redacts to Jordan Lee; nickname alias skipped.
+    expect(redact("Jordan turned it in.", map)).toBe(
+      `${tokenForStudentId(jordan.id)} turned it in.`,
+    );
+  });
+
+  it("redacts multi-part names including middle names", () => {
+    const longName: RosterStudent = {
+      id: "stu-long",
+      name: "Maria Elena Garcia",
+    };
+    const map = buildNameTokenMap([longName]);
+    expect(redact("Work by Maria Elena Garcia.", map)).toBe(
+      `Work by ${tokenForStudentId(longName.id)}.`,
+    );
+    expect(redact("Header: Garcia, Maria Elena", map)).toBe(
+      `Header: ${tokenForStudentId(longName.id)}`,
+    );
+  });
+
   it("redacts LMS Last, First header forms", () => {
     const map = buildNameTokenMap([maria]);
     expect(redact("Student: Garcia, Maria", map)).toBe(

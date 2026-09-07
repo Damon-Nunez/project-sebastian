@@ -14,7 +14,8 @@ export function normalizePersonName(name: string): string {
 
 /**
  * Full-name order variants used by both document match and redaction.
- * Roster "Maria Garcia" → also "Garcia Maria" and "Garcia, Maria".
+ * Roster "Maria Elena Garcia" → also "Garcia Maria Elena" and "Garcia, Maria Elena".
+ * Middle names stay with the given-name cluster (first + middles).
  */
 export function fullNameOrderVariants(fullName: string): string[] {
   const name = normalizePersonName(fullName);
@@ -26,8 +27,10 @@ export function fullNameOrderVariants(fullName: string): string[] {
   if (parts.length >= 2) {
     const first = parts[0]!;
     const last = parts[parts.length - 1]!;
-    variants.add(`${last} ${first}`);
-    variants.add(`${last}, ${first}`);
+    const middle = parts.slice(1, -1);
+    const given = [first, ...middle].join(" ");
+    variants.add(`${last} ${given}`);
+    variants.add(`${last}, ${given}`);
   }
 
   return [...variants];

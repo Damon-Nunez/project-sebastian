@@ -23,7 +23,8 @@ function splitName(fullName: string): { first: string; last: string | null } {
  * - Always: full roster name + Last/First order variants (shared with match)
  * - First name: only if unique across the roster (case-insensitive)
  * - Last name: only if unique across the roster
- * - Nicknames: none — no dictionary; only what's on the roster row
+ * - Nickname: only if unique among nicknames AND does not collide with another
+ *   student's first/last (no invented dictionary)
  * - Duplicate full names: first student id (lexicographic) owns that alias
  */
 export function aliasesForRoster(roster: RosterStudent[]): Map<string, string[]> {
@@ -31,12 +32,14 @@ export function aliasesForRoster(roster: RosterStudent[]): Map<string, string[]>
     .map((row) => ({
       id: row.id.trim(),
       name: normalizePersonName(row.name),
+      nickname: normalizePersonName(row.nickname ?? ""),
     }))
     .filter((row) => row.id.length > 0 && row.name.length > 0)
     .sort((a, b) => a.id.localeCompare(b.id));
 
   const firstCounts = new Map<string, number>();
   const lastCounts = new Map<string, number>();
+  const nicknameCounts = new Map<string, number>();
 
   for (const row of cleaned) {
     const { first, last } = splitName(row.name);
@@ -49,6 +52,10 @@ export function aliasesForRoster(roster: RosterStudent[]): Map<string, string[]>
         last.toLowerCase(),
         (lastCounts.get(last.toLowerCase()) ?? 0) + 1,
       );
+    }
+    if (row.nickname) {
+      const key = row.nickname.toLowerCase();
+      nicknameCounts.set(key, (nicknameCounts.get(key) ?? 0) + 1);
     }
   }
 
@@ -63,6 +70,20 @@ export function aliasesForRoster(roster: RosterStudent[]): Map<string, string[]>
     }
     if (last && (lastCounts.get(last.toLowerCase()) ?? 0) === 1) {
       aliases.add(last);
+    }
+    if (row.nickname && (nicknameCounts.get(row.nickname.toLowerCase()) ?? 0) === 1) {
+      const nickKey = row.nickname.toLowerCase();
+      const collidesWithOtherName = cleaned.some((other) => {
+        if (other.id === row.id) return false;
+        const parts = splitName(other.name);
+        return (
+          parts.first.toLowerCase() === nickKey ||
+          (parts.last !== null && parts.last.toLowerCase() === nickKey)
+        );
+      });
+      if (!collidesWithOtherName) {
+        aliases.add(row.nickname);
+      }
     }
 
     byId.set(row.id, [...aliases]);
@@ -80,6 +101,7 @@ export function buildNameTokenMap(roster: RosterStudent[]): NameTokenMap {
     .map((row) => ({
       id: row.id.trim(),
       name: normalizePersonName(row.name),
+      nickname: normalizePersonName(row.nickname ?? "") || null,
     }))
     .filter((row) => row.id.length > 0 && row.name.length > 0)
     .sort((a, b) => a.id.localeCompare(b.id));

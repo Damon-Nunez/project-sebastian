@@ -2,6 +2,8 @@
 export type RosterStudent = {
   id: string;
   name: string;
+  /** Optional preferred/nickname — redacted when present; never invented. */
+  nickname?: string | null;
 };
 
 /**

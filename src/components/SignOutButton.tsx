@@ -5,10 +5,16 @@ import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type SignOutButtonProps = {
+  displayName: string;
   email: string;
+  initials: string;
 };
 
-export function SignOutButton({ email }: SignOutButtonProps) {
+export function SignOutButton({
+  displayName,
+  email,
+  initials,
+}: SignOutButtonProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -22,9 +28,18 @@ export function SignOutButton({ email }: SignOutButtonProps) {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="hidden max-w-[14rem] truncate text-sm text-slate-600 sm:inline">
-        {email}
-      </span>
+      <div className="flex items-center gap-2">
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold tracking-wide text-white"
+          aria-hidden
+          title={email}
+        >
+          {initials}
+        </span>
+        <span className="hidden max-w-[12rem] truncate text-sm font-medium text-slate-800 sm:inline">
+          {displayName}
+        </span>
+      </div>
       <button
         type="button"
         onClick={handleSignOut}

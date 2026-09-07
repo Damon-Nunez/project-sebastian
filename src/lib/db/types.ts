@@ -11,6 +11,7 @@ export type AssignmentType = RubricKind;
 export type TeacherRow = {
   id: string;
   email: string | null;
+  display_name: string | null;
   auth_user_id: string | null;
   api_key_encrypted: string | null;
   usage_tokens: number | null;
@@ -32,6 +33,7 @@ export type StudentRow = {
   teacher_id: string;
   section_id: string;
   name: string;
+  nickname: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
