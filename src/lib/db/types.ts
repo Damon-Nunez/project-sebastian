@@ -66,6 +66,10 @@ export type LessonPlanRow = {
   module_label: string | null;
   unit_label: string | null;
   lesson_label: string | null;
+  /**
+   * Parsed / pre-filled / edited plan body (jsonb).
+   * Validate with lessonPlanContentSchema in `@/lib/lessons/content`.
+   */
   content: unknown;
   /** Per-section groups keyed by section_id. */
   section_groups: Record<string, unknown>;

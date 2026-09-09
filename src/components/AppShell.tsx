@@ -52,6 +52,12 @@ export async function AppShell({ children }: AppShellProps) {
                 >
                   Periods
                 </Link>
+                <Link
+                  href="/lessons"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                >
+                  Lessons
+                </Link>
               </nav>
             ) : null}
           </div>
