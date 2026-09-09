@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   emptyLessonPlanContent,
   emptyWorkTimeBlock,
+  withBodyVariants,
   type LessonPlanContent,
   workTimeKeyForIndex,
 } from "./content";
@@ -9,6 +10,7 @@ import {
 /**
  * Schema-constrained buckets for LLM framework sorting.
  * Revised formula constants — extract only, do not invent.
+ * Opening / Closing / Work Times include full body + simplified sibling.
  */
 export const frameworkLlmBucketsSchema = z.object({
   module_label: z.string().nullable(),
@@ -21,11 +23,14 @@ export const frameworkLlmBucketsSchema = z.object({
   opening: z.object({
     label: z.string(),
     body: z.string(),
+    /** Condensed teacher-facing version (core moves + questions to ask). */
+    bodySimplified: z.string().default(""),
     minutes: z.number().int().min(0).nullable(),
   }),
   closing: z.object({
     label: z.string(),
     body: z.string(),
+    bodySimplified: z.string().default(""),
     minutes: z.number().int().min(0).nullable(),
   }),
   /**
@@ -51,6 +56,7 @@ export const frameworkLlmBucketsSchema = z.object({
       title: z.string(),
       minutes: z.number().int().min(0).nullable(),
       body: z.string(),
+      bodySimplified: z.string().default(""),
     }),
   ),
 });
@@ -63,14 +69,14 @@ export const FRAMEWORK_LLM_JSON_SHAPE = `{
   "lesson_label": string | null,
   "learningTargets": string,
   "agenda": string,
-  "opening": { "label": string, "body": string, "minutes": number | null },
-  "closing": { "label": string, "body": string, "minutes": number | null },
+  "opening": { "label": string, "body": string, "bodySimplified": string, "minutes": number | null },
+  "closing": { "label": string, "body": string, "bodySimplified": string, "minutes": number | null },
   "entranceTicket": string,
   "vocabulary": string,
   "homework": string,
   "materials": string,
   "standardsCodes": string[],
-  "workTimes": [ { "title": string, "minutes": number | null, "body": string } ]
+  "workTimes": [ { "title": string, "minutes": number | null, "body": string, "bodySimplified": string } ]
 }`;
 
 /** Turn vocabulary into clean bullet lines (one term per line). */
@@ -101,7 +107,7 @@ export function formatVocabularyBullets(raw: string): string {
 /**
  * Map LLM buckets into LessonPlanContent for the form populater.
  * Learning Targets + Homework land in extras until first-class schema fields.
- * Work Time bodies are pre-filled from the framework and remain editable.
+ * Edited body starts as a copy of Original; Simplified is its own sibling.
  */
 export function bucketsToLessonPlanContent(
   buckets: FrameworkLlmBuckets,
@@ -114,13 +120,14 @@ export function bucketsToLessonPlanContent(
       : buckets.workTimes.map((wt, i) => {
           const block = emptyWorkTimeBlock(i);
           const title = wt.title.trim();
+          const variants = withBodyVariants(wt.body, wt.bodySimplified);
           return {
             ...block,
             label: title
               ? `Work Time ${workTimeKeyForIndex(i)}: ${title}`
               : block.label,
             minutes: wt.minutes,
-            body: wt.body.trim(),
+            ...variants,
           };
         });
 
@@ -128,17 +135,26 @@ export function bucketsToLessonPlanContent(
   if (buckets.learningTargets.trim()) {
     extras.push({
       label: "Learning Targets",
-      body: buckets.learningTargets.trim(),
+      ...withBodyVariants(buckets.learningTargets),
       minutes: null,
     });
   }
   if (buckets.homework.trim()) {
     extras.push({
       label: "Homework",
-      body: buckets.homework.trim(),
+      ...withBodyVariants(buckets.homework),
       minutes: null,
     });
   }
+
+  const openingVariants = withBodyVariants(
+    buckets.opening.body,
+    buckets.opening.bodySimplified,
+  );
+  const closingVariants = withBodyVariants(
+    buckets.closing.body,
+    buckets.closing.bodySimplified,
+  );
 
   return {
     ...base,
@@ -152,15 +168,16 @@ export function bucketsToLessonPlanContent(
     materials: buckets.materials.trim(),
     opening: {
       label: buckets.opening.label.trim() || "Opening",
-      body: buckets.opening.body.trim(),
       minutes: buckets.opening.minutes,
+      ...openingVariants,
     },
     closing: {
       label: buckets.closing.label.trim() || "Closing",
-      body: buckets.closing.body.trim(),
       minutes: buckets.closing.minutes,
+      ...closingVariants,
     },
     workTimes,
+    workTimesReservoir: [],
     extras,
   };
 }

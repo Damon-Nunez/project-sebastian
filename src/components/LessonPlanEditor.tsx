@@ -5,7 +5,9 @@ import { saveLessonPlanAction } from "@/app/lessons/actions";
 import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import {
+  bodyForViewMode,
   resizeWorkTimes,
+  type BodyViewMode,
   type LessonPlanContent,
 } from "@/lib/lessons/content";
 import { STANDARD_CLASSWORK_RUBRIC } from "@/lib/lessons/standardRubric";
@@ -119,28 +121,72 @@ function FieldHeader({
   );
 }
 
+function ViewModePills({
+  value,
+  onChange,
+  size = "md",
+}: {
+  value: BodyViewMode | null;
+  onChange: (mode: BodyViewMode) => void;
+  size?: "sm" | "md";
+}) {
+  const modes: { id: BodyViewMode; label: string }[] = [
+    { id: "edited", label: "Edited" },
+    { id: "simplified", label: "Simplified" },
+    { id: "original", label: "Original" },
+  ];
+  const pad = size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-3 py-1.5 text-xs";
+  return (
+    <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
+      {modes.map((mode) => (
+        <button
+          key={mode.id}
+          type="button"
+          className={`rounded-full font-medium ${pad} ${
+            value === mode.id
+              ? "bg-slate-900 text-white shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+          onClick={() => onChange(mode.id)}
+        >
+          {mode.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PreviewSection({
   title,
   children,
   empty,
   minutes,
+  mode,
+  onModeChange,
 }: {
   title: string;
   children?: ReactNode;
   empty?: boolean;
   minutes?: number | null;
+  mode?: BodyViewMode;
+  onModeChange?: (mode: BodyViewMode) => void;
 }) {
   const time = formatMinutes(minutes);
   return (
     <section className="border-b border-slate-100 pb-4 last:border-b-0 last:pb-0">
-      <div className="flex flex-wrap items-baseline gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          {title}
-        </h3>
-        {time ? (
-          <span className="rounded bg-cyan-100 px-1.5 py-0.5 text-[11px] font-medium text-cyan-900">
-            {time}
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {title}
+          </h3>
+          {time ? (
+            <span className="rounded bg-cyan-100 px-1.5 py-0.5 text-[11px] font-medium text-cyan-900">
+              {time}
+            </span>
+          ) : null}
+        </div>
+        {mode && onModeChange ? (
+          <ViewModePills value={mode} onChange={onModeChange} size="sm" />
         ) : null}
       </div>
       {empty ? (
@@ -223,6 +269,47 @@ export function LessonPlanEditor({
   const [workTimeCountDraft, setWorkTimeCountDraft] = useState(
     String(Math.max(1, initialContent.workTimes.length)),
   );
+  const [openingMode, setOpeningMode] = useState<BodyViewMode>("edited");
+  const [closingMode, setClosingMode] = useState<BodyViewMode>("edited");
+  const [workTimeModes, setWorkTimeModes] = useState<Record<string, BodyViewMode>>(
+    {},
+  );
+
+  function workTimeModeFor(key: string): BodyViewMode {
+    return workTimeModes[key] ?? "edited";
+  }
+
+  function setWorkTimeMode(key: string, mode: BodyViewMode) {
+    setWorkTimeModes((prev) => ({ ...prev, [key]: mode }));
+  }
+
+  /** Plan-wide left-pane mode for Opening / Work Times / Closing. */
+  function setAllPreviewModes(mode: BodyViewMode) {
+    setOpeningMode(mode);
+    setClosingMode(mode);
+    setWorkTimeModes(() => {
+      const next: Record<string, BodyViewMode> = {};
+      for (const wt of content.workTimes) {
+        next[wt.key] = mode;
+      }
+      return next;
+    });
+  }
+
+  const previewModesAligned: BodyViewMode | "mixed" = (() => {
+    const modes = [
+      openingMode,
+      closingMode,
+      ...content.workTimes.map((wt) => workTimeModeFor(wt.key)),
+    ];
+    const first = modes[0] ?? "edited";
+    return modes.every((m) => m === first) ? first : "mixed";
+  })();
+
+  function openFinalDraftPreview() {
+    setAllPreviewModes("edited");
+    setMobilePane("preview");
+  }
 
   const learningTargets = findExtra(content, "Learning Targets");
   const homework = findExtra(content, "Homework");
@@ -331,23 +418,57 @@ export function LessonPlanEditor({
   const preview = (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Live preview
-        </p>
-        <h2 className="mt-1 text-lg font-semibold text-slate-900">
-          {moduleLabel || unitLabel || lessonLabel
-            ? [
-                moduleLabel ? `Module ${moduleLabel}` : null,
-                unitLabel ? `Unit ${unitLabel}` : null,
-                lessonLabel ? `Lesson ${lessonLabel}` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            : "Lesson draft"}
-        </h2>
-        {content.lessonDate ? (
-          <p className="mt-1 text-sm text-slate-500">{content.lessonDate}</p>
-        ) : null}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Reference preview
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">
+              {moduleLabel || unitLabel || lessonLabel
+                ? [
+                    moduleLabel ? `Module ${moduleLabel}` : null,
+                    unitLabel ? `Unit ${unitLabel}` : null,
+                    lessonLabel ? `Lesson ${lessonLabel}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "Lesson draft"}
+            </h2>
+            {content.lessonDate ? (
+              <p className="mt-1 text-sm text-slate-500">{content.lessonDate}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+            onClick={openFinalDraftPreview}
+          >
+            Preview final draft
+          </button>
+        </div>
+        <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
+          <p className="text-xs text-slate-500">
+            Swap Opening / Work Time / Closing here to copy or compare. Right side
+            stays your editable <span className="font-medium text-slate-700">Edited</span>{" "}
+            draft.{" "}
+            <span className="font-medium text-slate-700">Preview final draft</span>{" "}
+            jumps everything back to Edited.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              All long sections
+            </span>
+            <ViewModePills
+              value={
+                previewModesAligned === "mixed" ? null : previewModesAligned
+              }
+              onChange={setAllPreviewModes}
+            />
+            {previewModesAligned === "mixed" ? (
+              <span className="text-[11px] text-amber-800">Mixed per section</span>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -366,8 +487,8 @@ export function LessonPlanEditor({
           ))}
         </ul>
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          Opening, Closing, Homework, and Work Time are starting text from the
-          framework — edit freely. Work Time count/minutes can be adjusted too.
+          Opening, Closing, and Work Time keep Original + Simplified from the
+          parser; only Edited is saved as your working draft for generation.
         </p>
       </div>
 
@@ -418,29 +539,39 @@ export function LessonPlanEditor({
 
         <PreviewSection
           title={content.opening.label || "Opening"}
-          empty={!normalize(content.opening.body)}
+          empty={!normalize(bodyForViewMode(content.opening, openingMode))}
           minutes={content.opening.minutes}
+          mode={openingMode}
+          onModeChange={setOpeningMode}
         >
-          {content.opening.body}
+          {bodyForViewMode(content.opening, openingMode)}
         </PreviewSection>
 
-        {content.workTimes.map((wt) => (
-          <PreviewSection
-            key={wt.key}
-            title={wt.label || `Work Time ${wt.key}`}
-            empty={!normalize(wt.body)}
-            minutes={wt.minutes}
-          >
-            {wt.body}
-          </PreviewSection>
-        ))}
+        {content.workTimes.map((wt) => {
+          const mode = workTimeModeFor(wt.key);
+          const text = bodyForViewMode(wt, mode);
+          return (
+            <PreviewSection
+              key={wt.key}
+              title={wt.label || `Work Time ${wt.key}`}
+              empty={!normalize(text)}
+              minutes={wt.minutes}
+              mode={mode}
+              onModeChange={(next) => setWorkTimeMode(wt.key, next)}
+            >
+              {text}
+            </PreviewSection>
+          );
+        })}
 
         <PreviewSection
           title={content.closing.label || "Closing"}
-          empty={!normalize(content.closing.body)}
+          empty={!normalize(bodyForViewMode(content.closing, closingMode))}
           minutes={content.closing.minutes}
+          mode={closingMode}
+          onModeChange={setClosingMode}
         >
-          {content.closing.body}
+          {bodyForViewMode(content.closing, closingMode)}
         </PreviewSection>
 
         <PreviewSection
@@ -468,7 +599,10 @@ export function LessonPlanEditor({
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Edit fields</h2>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          Changes update the preview immediately. Save when you&apos;re ready.
+          Always edits your <span className="font-medium text-slate-700">Edited</span>{" "}
+          draft. Use the left preview to reference Simplified / Original while you
+          type — then hit <span className="font-medium text-slate-700">Preview final draft</span>{" "}
+          to see the whole Edited plan again.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
@@ -651,7 +785,7 @@ export function LessonPlanEditor({
             initialSnapshot.opening.body,
             content.opening.body,
           )}
-          hint="Starting text from the framework — rewrite in your voice"
+          hint="Your editable draft (starts as Original)"
         />
         <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
           <label className="block">
@@ -709,7 +843,7 @@ export function LessonPlanEditor({
                 )
               : "empty"
           }
-          hint={`Pre-filled from the framework (${content.workTimes.length} block(s)) — edit label, minutes, or description anytime.`}
+          hint={`Pre-filled from the framework (${content.workTimes.length} block(s)). Lowering count parks extras so you can restore them.`}
         />
         <label className="block max-w-32">
           <span className={labelClass}>Block count</span>
@@ -731,6 +865,13 @@ export function LessonPlanEditor({
           />
           <p className="mt-1 text-[11px] text-slate-500">1–8 · applies on blur</p>
         </label>
+        {(content.workTimesReservoir?.length ?? 0) > 0 ? (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-inset ring-amber-200">
+            {content.workTimesReservoir.length} Work Time block(s) parked from a
+            lower count — raise the block count to bring them back (with Original
+            + Simplified intact).
+          </p>
+        ) : null}
         {content.workTimes.map((wt, index) => (
           <div key={wt.key} className="space-y-2 border-t border-slate-100 pt-4">
             <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
@@ -799,7 +940,7 @@ export function LessonPlanEditor({
             initialSnapshot.closing.body,
             content.closing.body,
           )}
-          hint="Starting text from the framework — rewrite in your voice"
+          hint="Your editable draft (starts as Original)"
         />
         <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
           <label className="block">

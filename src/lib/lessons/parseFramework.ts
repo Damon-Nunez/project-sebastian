@@ -1,6 +1,7 @@
 import {
   emptyLessonPlanContent,
   emptyWorkTimeBlock,
+  withBodyVariants,
   type LessonPlanContent,
   type WorkTimeBlock,
   workTimeKeyForIndex,
@@ -153,11 +154,12 @@ function finalizeWorkTimes(
   return keys.map((key, index) => {
     const block = byKey.get(key)!;
     const normalizedKey = workTimeKeyForIndex(index);
+    const variants = withBodyVariants(block.body);
     return {
       key: normalizedKey,
       label: block.label || `Work Time ${normalizedKey}`,
       minutes: block.minutes ?? null,
-      body: block.body.trim(),
+      ...variants,
     };
   });
 }
@@ -217,6 +219,8 @@ export function parseFrameworkText(text: string): LessonPlanContent {
               : `Work Time ${key}`,
             minutes: null,
             body: "",
+            bodyOriginal: "",
+            bodySimplified: "",
           });
         } else if (heading.workKey) {
           workByKey.get(key)!.label = heading.label;
@@ -248,7 +252,13 @@ export function parseFrameworkText(text: string): LessonPlanContent {
         continue;
       }
       if (heading.kind === "extra") {
-        content.extras.push({ label: heading.label, body: "", minutes: null });
+        content.extras.push({
+          label: heading.label,
+          body: "",
+          bodyOriginal: "",
+          bodySimplified: "",
+          minutes: null,
+        });
         open = { kind: "extra" };
         continue;
       }
@@ -279,11 +289,17 @@ export function parseFrameworkText(text: string): LessonPlanContent {
   content.standards = content.standards.trim();
   content.agenda = content.agenda.trim();
   content.materials = content.materials.trim();
-  content.opening.body = content.opening.body.trim();
-  content.closing.body = content.closing.body.trim();
+  content.opening = {
+    ...content.opening,
+    ...withBodyVariants(content.opening.body),
+  };
+  content.closing = {
+    ...content.closing,
+    ...withBodyVariants(content.closing.body),
+  };
   content.extras = content.extras.map((e) => ({
     ...e,
-    body: e.body.trim(),
+    ...withBodyVariants(e.body),
   }));
 
   return content;
