@@ -1,4 +1,5 @@
 import type { DocumentRow, LessonPlanRow } from "@/lib/db/types";
+import { isAnthropicConfigured } from "@/lib/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { parseLessonPlanContent, type LessonPlanContent } from "./content";
 import {
@@ -7,7 +8,9 @@ import {
   UnsupportedFrameworkFormatError,
 } from "./extract";
 import { resolveLessonLabels } from "./labels";
+import { bucketsToLessonPlanContent } from "./llmBuckets";
 import { parseFrameworkText } from "./parseFramework";
+import { parseFrameworkWithLlm } from "./parseFrameworkLlm";
 
 const PLAN_SELECT =
   "id, teacher_id, module_label, unit_label, lesson_label, content, section_groups, free_text_asks, status, drive_file_id, created_at, updated_at";
@@ -67,6 +70,35 @@ export async function getLessonPlanForTeacher(
 }
 
 /**
+ * Prefer schema-constrained LLM bucket sort; fall back to keyword parse
+ * when Anthropic is unset or the LLM call/validation fails.
+ */
+async function parseFrameworkContentForUpload(input: {
+  teacherId: string;
+  filename: string;
+  text: string;
+}): Promise<LessonPlanContent> {
+  if (!isAnthropicConfigured()) {
+    return parseFrameworkText(input.text);
+  }
+
+  try {
+    const { buckets } = await parseFrameworkWithLlm({
+      text: input.text,
+      teacherId: input.teacherId,
+      filename: input.filename,
+    });
+    return bucketsToLessonPlanContent(buckets);
+  } catch (error) {
+    console.error(
+      "LLM framework parse failed; falling back to keyword parse",
+      error,
+    );
+    return parseFrameworkText(input.text);
+  }
+}
+
+/**
  * Extract + parse a framework upload, then create a draft lesson_plans row
  * and a documents metadata row (storage_path left null for V1).
  */
@@ -91,7 +123,12 @@ export async function createLessonPlanFromFrameworkUpload(input: {
     buffer: input.bytes,
     filename: input.filename,
   });
-  const content = parseFrameworkText(extracted.text);
+  const content = await parseFrameworkContentForUpload({
+    teacherId: input.teacherId,
+    filename: input.filename,
+    text: extracted.text,
+  });
+  // M/U/L from text+filename regex (more reliable than LLM titles).
   const labels = resolveLessonLabels({
     text: extracted.text,
     filename: input.filename,

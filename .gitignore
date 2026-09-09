@@ -12,6 +12,13 @@
 
 # testing
 /coverage
+# Ticket 5 parser calibration — local only for now
+scripts/generate-framework-goldens.ts
+src/lib/lessons/**/*.test.ts
+src/lib/lessons/fixtures/
+
+# local parse / LLM trial dumps
+/tmp-parse/
 
 # next.js
 /.next/
