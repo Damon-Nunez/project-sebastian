@@ -12,17 +12,18 @@ export const FRAMEWORK_PARSE_MODEL = "claude-haiku-4-5-20251001";
 const SYSTEM_PROMPT = `You sort district lesson-framework text into fixed JSON buckets for a teacher lesson-plan form.
 
 Rules:
-- Extract and sort only. Do not invent, rewrite in a new voice, or add teaching tips that are not in the text.
+- Extract and sort only. Do not invent teaching tips that are not in the text. Light cleanup for readability is OK (grammar, line breaks, bullets).
 - If a bucket has no clear source text, use "" or [] or null as appropriate.
 - agenda: short timed outline only (Opening / Work Time / Closing lines with minutes). Stop before Teaching Notes, Purpose, Support All Students, In advance, worksheets, or homework bodies.
 - homework: homework assignments only — never put homework inside agenda.
-- opening / closing: instructional body for those segments (Opening A/B, Closing and Assessment, Exit Ticket directions). Prefer the real lesson segment text over agenda one-liners.
+- opening / closing: instructional body for those segments (Opening A/B, Closing and Assessment, Exit Ticket facilitation). Prefer the real lesson segment text over agenda one-liners. Set minutes from the agenda when present.
+- entranceTicket: the student-facing Entrance Ticket prompt/question(s) from the framework (e.g. "QUESTION 1 …"). Include the question text students answer as they enter. Do NOT omit this when an Entrance Ticket section exists. Skip long "Note for Evaluating Responses" answer keys when possible.
+- vocabulary: one vocabulary item per line as "term — short gloss" when glosses exist. Use clear readable wording. Prefer bullet-ready lines (we will prefix •). Do not dump a single run-on comma sentence when you can list items.
 - learningTargets: the "I can…" targets only.
 - materials: materials lists if present; otherwise "".
 - standardsCodes: codes only (e.g. 8R6, RL.8.1, RST3). No prose descriptions.
-- suggestedWorkTimeCount: how many Work Time blocks the source outlines (A/B/C…).
-- workTimeTitles: short titles for each Work Time (no full instructional bodies — teacher owns those).
-- Ignore export noise: presentations, full entrance/exit ticket worksheets, page numbers, rubric tables unless they are the only standards codes.
+- workTimes: one object per Work Time block (A, B, C…). Include short title, minutes from the agenda, AND the instructional body from that Work Time segment (Description / Meeting Students' Needs can be trimmed; keep the core teacher/student moves). Do not leave body empty when the framework has Work Time content. Merge Ongoing Assessment lines that belong to the same lettered Work Time into that block's title or body when helpful.
+- Ignore export noise: slide presentations, page numbers, and generic rubric tables (the app injects a standard rubric separately).
 - Return ONLY valid JSON matching this shape (no markdown fences, no commentary):
 ${FRAMEWORK_LLM_JSON_SHAPE}`;
 
@@ -93,7 +94,9 @@ export async function parseFrameworkWithLlm(input: {
     maxTokens: 8192,
   });
 
-  const rawResponse = messageText(message.content as { type: string; text?: string }[]);
+  const rawResponse = messageText(
+    message.content as { type: string; text?: string }[],
+  );
   const parsed = extractJsonObject(rawResponse);
   const buckets = frameworkLlmBucketsSchema.parse(parsed);
 

@@ -1,3 +1,4 @@
+import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
 import { FrameworkUploadForm } from "@/components/FrameworkUploadForm";
 import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
 import { lessonErrorMessage } from "@/lib/lessons/errors";
@@ -57,21 +58,32 @@ export default async function LessonsPage({ searchParams }: LessonsPageProps) {
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-slate-100">
-              {plans.map((plan) => (
-                <li key={plan.id}>
-                  <Link
-                    href={`/lessons/${plan.id}`}
-                    className="flex items-center justify-between gap-4 py-3 text-sm transition hover:bg-slate-50"
+              {plans.map((plan) => {
+                const title = planTitle(plan);
+                return (
+                  <li
+                    key={plan.id}
+                    className="flex items-center gap-2 py-2"
                   >
-                    <span className="font-medium text-slate-900">
-                      {planTitle(plan)}
-                    </span>
-                    <span className="capitalize text-slate-500">
-                      {plan.status}
-                    </span>
-                  </Link>
-                </li>
-              ))}
+                    <Link
+                      href={`/lessons/${plan.id}`}
+                      className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-md px-2 py-2 text-sm transition hover:bg-slate-50"
+                    >
+                      <span className="truncate font-medium text-slate-900">
+                        {title}
+                      </span>
+                      <span className="shrink-0 capitalize text-slate-500">
+                        {plan.status}
+                      </span>
+                    </Link>
+                    <DeleteLessonDraftButton
+                      lessonId={plan.id}
+                      draftTitle={title}
+                      variant="icon"
+                    />
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

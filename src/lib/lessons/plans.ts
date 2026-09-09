@@ -241,4 +241,49 @@ export async function updateLessonPlanContent(input: {
   return asPlanRow(data as Record<string, unknown>);
 }
 
+/**
+ * Delete a lesson plan owned by the teacher, plus linked document rows.
+ * Documents FK is ON DELETE SET NULL — we remove them explicitly.
+ */
+export async function deleteLessonPlanForTeacher(
+  teacherId: string,
+  lessonPlanId: string,
+): Promise<void> {
+  const admin = createAdminSupabaseClient();
+
+  const { data: existing, error: lookupError } = await admin
+    .from("lesson_plans")
+    .select("id")
+    .eq("teacher_id", teacherId)
+    .eq("id", lessonPlanId)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(`Failed to look up lesson plan: ${lookupError.message}`);
+  }
+  if (!existing) {
+    throw new Error("Lesson plan not found");
+  }
+
+  const { error: docsError } = await admin
+    .from("documents")
+    .delete()
+    .eq("teacher_id", teacherId)
+    .eq("lesson_plan_id", lessonPlanId);
+
+  if (docsError) {
+    throw new Error(`Failed to delete linked documents: ${docsError.message}`);
+  }
+
+  const { error: planError } = await admin
+    .from("lesson_plans")
+    .delete()
+    .eq("teacher_id", teacherId)
+    .eq("id", lessonPlanId);
+
+  if (planError) {
+    throw new Error(`Failed to delete lesson plan: ${planError.message}`);
+  }
+}
+
 export { MAX_FRAMEWORK_BYTES };

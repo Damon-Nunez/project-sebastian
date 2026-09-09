@@ -156,6 +156,7 @@ function finalizeWorkTimes(
     return {
       key: normalizedKey,
       label: block.label || `Work Time ${normalizedKey}`,
+      minutes: block.minutes ?? null,
       body: block.body.trim(),
     };
   });
@@ -214,6 +215,7 @@ export function parseFrameworkText(text: string): LessonPlanContent {
             label: heading.workKey
               ? heading.label
               : `Work Time ${key}`,
+            minutes: null,
             body: "",
           });
         } else if (heading.workKey) {
@@ -246,7 +248,7 @@ export function parseFrameworkText(text: string): LessonPlanContent {
         continue;
       }
       if (heading.kind === "extra") {
-        content.extras.push({ label: heading.label, body: "" });
+        content.extras.push({ label: heading.label, body: "", minutes: null });
         open = { kind: "extra" };
         continue;
       }

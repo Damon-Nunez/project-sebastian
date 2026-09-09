@@ -11,6 +11,7 @@ export const LESSON_ERROR_MESSAGES = {
   missing_lesson: "That lesson draft could not be found.",
   invalid_save: "Could not save — the form data was invalid.",
   save_failed: "Save failed. Please try again.",
+  delete_failed: "Could not delete that draft. Please try again.",
 } as const;
 
 export type LessonErrorCode = keyof typeof LESSON_ERROR_MESSAGES;

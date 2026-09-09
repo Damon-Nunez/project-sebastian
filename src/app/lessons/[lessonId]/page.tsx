@@ -31,6 +31,8 @@ export default async function LessonDetailPage({
     plan.unit_label ? `Unit ${plan.unit_label}` : null,
     plan.lesson_label ? `Lesson ${plan.lesson_label}` : null,
   ].filter(Boolean);
+  const draftTitle =
+    titleBits.length > 0 ? titleBits.join(" · ") : "Untitled draft";
 
   return (
     <section className="space-y-6">
@@ -43,12 +45,11 @@ export default async function LessonDetailPage({
           Draft
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-          {titleBits.length > 0 ? titleBits.join(" · ") : "Lesson draft"}
+          {draftTitle === "Untitled draft" ? "Lesson draft" : draftTitle}
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          Review the pre-filled formula sections, adjust Work Time count, and
-          add any custom asks. Save keeps this draft ready for AI generation
-          later.
+          Left: live lesson preview and what came from the upload. Right: edit
+          fields (Work Time bodies are yours). Save when it looks right.
         </p>
       </div>
 
@@ -72,6 +73,7 @@ export default async function LessonDetailPage({
 
       <LessonPlanEditor
         lessonId={plan.id}
+        draftTitle={draftTitle}
         initialContent={content}
         initialFreeTextAsks={plan.free_text_asks ?? ""}
         initialModuleLabel={plan.module_label ?? ""}

@@ -6,14 +6,20 @@ import { z } from "zod";
  * free_text_asks, and section_groups.
  */
 
+const minutesSchema = z.number().int().min(0).nullable().default(null);
+
 const labeledBlockSchema = z.object({
   label: z.string(),
   body: z.string(),
+  /** Agenda timing when known (Opening / Closing). */
+  minutes: minutesSchema,
 });
 
 const workTimeBlockSchema = z.object({
   key: z.string().min(1),
   label: z.string(),
+  /** Minutes allotted for this block when known from the framework. */
+  minutes: minutesSchema,
   body: z.string(),
 });
 
@@ -28,6 +34,13 @@ export const lessonPlanContentSchema = z.object({
   lessonDate: lessonDateSchema,
   standards: z.string(),
   agenda: z.string(),
+  /** Academic / domain vocabulary list from the framework. */
+  vocabulary: z.string().default(""),
+  /**
+   * Student-facing entrance ticket prompt/questions from the framework.
+   * Distinct from Opening body (teacher routine / interpretation).
+   */
+  entranceTicket: z.string().default(""),
   materials: z.string(),
   opening: labeledBlockSchema,
   workTimes: z.array(workTimeBlockSchema),
@@ -54,8 +67,13 @@ export function emptyWorkTimeBlock(index: number): WorkTimeBlock {
   return {
     key,
     label: `Work Time ${key}`,
+    minutes: null,
     body: "",
   };
+}
+
+export function emptyLabeledBlock(label: string): LabeledBlock {
+  return { label, body: "", minutes: null };
 }
 
 /** Blank plan body ready for parse pre-fill or teacher edit. */
@@ -72,12 +90,14 @@ export function emptyLessonPlanContent(
     lessonDate: null,
     standards: "",
     agenda: "",
+    vocabulary: "",
+    entranceTicket: "",
     materials: "",
-    opening: { label: "Opening", body: "" },
+    opening: emptyLabeledBlock("Opening"),
     workTimes: Array.from({ length: workTimeCount }, (_, i) =>
       emptyWorkTimeBlock(i),
     ),
-    closing: { label: "Closing", body: "" },
+    closing: emptyLabeledBlock("Closing"),
     extras: [],
   };
 }
@@ -117,7 +137,7 @@ export function resizeWorkTimes(
         !block.label || DEFAULT_WORK_TIME_LABEL.test(block.label)
           ? `Work Time ${key}`
           : block.label;
-      return { ...block, key, label };
+      return { ...block, key, label, minutes: block.minutes ?? null };
     }),
   };
 }

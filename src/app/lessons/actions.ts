@@ -11,6 +11,7 @@ import { parseLessonPlanContent } from "@/lib/lessons/content";
 import type { LessonErrorCode } from "@/lib/lessons/errors";
 import {
   createLessonPlanFromFrameworkUpload,
+  deleteLessonPlanForTeacher,
   updateLessonPlanContent,
 } from "@/lib/lessons/plans";
 
@@ -96,4 +97,22 @@ export async function saveLessonPlanAction(formData: FormData) {
   revalidatePath("/lessons");
   revalidatePath(`/lessons/${lessonId}`);
   redirect(`/lessons/${lessonId}?saved=1`);
+}
+
+export async function deleteLessonPlanAction(formData: FormData) {
+  const teacher = await getCurrentTeacher();
+  const lessonId = formString(formData, "lessonId");
+  if (!lessonId) {
+    redirectLessonsError("missing_lesson");
+  }
+
+  try {
+    await deleteLessonPlanForTeacher(teacher.id, lessonId);
+  } catch (error) {
+    console.error("deleteLessonPlanAction failed", error);
+    redirectLessonsError("delete_failed");
+  }
+
+  revalidatePath("/lessons");
+  redirect("/lessons");
 }

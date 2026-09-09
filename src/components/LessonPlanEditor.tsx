@@ -1,21 +1,26 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent, type ReactNode } from "react";
 import { saveLessonPlanAction } from "@/app/lessons/actions";
+import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import {
   resizeWorkTimes,
   type LessonPlanContent,
 } from "@/lib/lessons/content";
+import { STANDARD_CLASSWORK_RUBRIC } from "@/lib/lessons/standardRubric";
 
 type LessonPlanEditorProps = {
   lessonId: string;
+  draftTitle: string;
   initialContent: LessonPlanContent;
   initialFreeTextAsks: string;
   initialModuleLabel: string;
   initialUnitLabel: string;
   initialLessonLabel: string;
 };
+
+type FieldStatus = "from-upload" | "edited" | "empty" | "yours" | "fixed";
 
 const labelClass =
   "text-xs font-medium uppercase tracking-wide text-slate-500";
@@ -25,8 +30,183 @@ const textareaClass = `${inputClass} min-h-28 resize-y`;
 const buttonClass =
   "rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-wait disabled:opacity-70";
 
+function normalize(value: string): string {
+  return value.replace(/\r\n/g, "\n").trim();
+}
+
+function statusForText(initial: string, current: string): FieldStatus {
+  const cur = normalize(current);
+  const init = normalize(initial);
+  if (!cur) return "empty";
+  if (!init) return "edited";
+  if (cur === init) return "from-upload";
+  return "edited";
+}
+
+function findExtra(
+  content: LessonPlanContent,
+  label: string,
+): { index: number; body: string } | null {
+  const index = content.extras.findIndex(
+    (e) => e.label.toLowerCase() === label.toLowerCase(),
+  );
+  if (index < 0) return null;
+  return { index, body: content.extras[index]!.body };
+}
+
+function parseStandardsCodes(raw: string): string[] {
+  return raw
+    .split(/[,;\n]+/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
+function formatMinutes(minutes: number | null | undefined): string | null {
+  if (minutes == null || !Number.isFinite(minutes)) return null;
+  return `${minutes} min`;
+}
+
+function StatusBadge({ status }: { status: FieldStatus }) {
+  const copy: Record<FieldStatus, { text: string; className: string }> = {
+    "from-upload": {
+      text: "From upload",
+      className: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+    },
+    edited: {
+      text: "Edited",
+      className: "bg-amber-50 text-amber-900 ring-amber-200",
+    },
+    empty: {
+      text: "Empty",
+      className: "bg-slate-100 text-slate-600 ring-slate-200",
+    },
+    yours: {
+      text: "You write",
+      className: "bg-sky-50 text-sky-900 ring-sky-200",
+    },
+    fixed: {
+      text: "Fixed",
+      className: "bg-violet-50 text-violet-900 ring-violet-200",
+    },
+  };
+  const item = copy[status];
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${item.className}`}
+    >
+      {item.text}
+    </span>
+  );
+}
+
+function FieldHeader({
+  title,
+  status,
+  hint,
+}: {
+  title: string;
+  status: FieldStatus;
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <span className={labelClass}>{title}</span>
+        {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
+      </div>
+      <StatusBadge status={status} />
+    </div>
+  );
+}
+
+function PreviewSection({
+  title,
+  children,
+  empty,
+  minutes,
+}: {
+  title: string;
+  children?: ReactNode;
+  empty?: boolean;
+  minutes?: number | null;
+}) {
+  const time = formatMinutes(minutes);
+  return (
+    <section className="border-b border-slate-100 pb-4 last:border-b-0 last:pb-0">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {title}
+        </h3>
+        {time ? (
+          <span className="rounded bg-cyan-100 px-1.5 py-0.5 text-[11px] font-medium text-cyan-900">
+            {time}
+          </span>
+        ) : null}
+      </div>
+      {empty ? (
+        <p className="mt-2 text-sm italic text-slate-400">Not filled yet</p>
+      ) : (
+        <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StandardRubricPreview() {
+  return (
+    <section className="border-b border-slate-100 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {STANDARD_CLASSWORK_RUBRIC.title}
+        </h3>
+        <StatusBadge status="fixed" />
+      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        District standard rubric — always included, not edited per lesson.
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {STANDARD_CLASSWORK_RUBRIC.levels.map((level) => (
+          <div
+            key={level.score}
+            className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+          >
+            <p className={`text-xs font-semibold ${level.headerClass}`}>
+              {level.score} {level.label}
+            </p>
+            <ul className="mt-2 space-y-1.5 text-[11px] leading-4 text-slate-600">
+              {level.criteria.map((line) => (
+                <li key={line} className="flex gap-1.5">
+                  <span aria-hidden className="mt-0.5 text-slate-400">
+                    ☐
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function minutesInputValue(minutes: number | null | undefined): string {
+  return minutes == null ? "" : String(minutes);
+}
+
+function parseMinutesInput(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
+
 export function LessonPlanEditor({
   lessonId,
+  draftTitle,
   initialContent,
   initialFreeTextAsks,
   initialModuleLabel,
@@ -38,25 +218,259 @@ export function LessonPlanEditor({
   const [moduleLabel, setModuleLabel] = useState(initialModuleLabel);
   const [unitLabel, setUnitLabel] = useState(initialUnitLabel);
   const [lessonLabel, setLessonLabel] = useState(initialLessonLabel);
+  const [mobilePane, setMobilePane] = useState<"preview" | "edit">("preview");
+  const [initialSnapshot] = useState(initialContent);
+  const [workTimeCountDraft, setWorkTimeCountDraft] = useState(
+    String(Math.max(1, initialContent.workTimes.length)),
+  );
 
-  function onWorkTimeCountChange(event: ChangeEvent<HTMLInputElement>) {
-    const count = Number(event.target.value);
-    if (!Number.isFinite(count)) return;
-    setContent((prev) => resizeWorkTimes(prev, Math.min(8, Math.max(1, count))));
+  const learningTargets = findExtra(content, "Learning Targets");
+  const homework = findExtra(content, "Homework");
+  const initialTargets = findExtra(initialSnapshot, "Learning Targets");
+  const initialHomework = findExtra(initialSnapshot, "Homework");
+
+  const otherExtras = content.extras
+    .map((extra, index) => ({ extra, index }))
+    .filter(
+      ({ extra }) =>
+        extra.label.toLowerCase() !== "learning targets" &&
+        extra.label.toLowerCase() !== "homework",
+    );
+
+  const standardsCodes = parseStandardsCodes(content.standards);
+  const workBodiesFilled = content.workTimes.some((w) => normalize(w.body));
+
+  const provenance: { label: string; status: FieldStatus }[] = [
+    {
+      label: "Standards",
+      status: statusForText(initialSnapshot.standards, content.standards),
+    },
+    {
+      label: "Learning Targets",
+      status: statusForText(
+        initialTargets?.body ?? "",
+        learningTargets?.body ?? "",
+      ),
+    },
+    {
+      label: "Agenda",
+      status: statusForText(initialSnapshot.agenda, content.agenda),
+    },
+    {
+      label: "Entrance Ticket",
+      status: statusForText(
+        initialSnapshot.entranceTicket,
+        content.entranceTicket,
+      ),
+    },
+    {
+      label: "Vocabulary",
+      status: statusForText(initialSnapshot.vocabulary, content.vocabulary),
+    },
+    { label: "Classwork Rubric", status: "fixed" },
+    {
+      label: "Materials",
+      status: statusForText(initialSnapshot.materials, content.materials),
+    },
+    {
+      label: "Opening",
+      status: statusForText(
+        initialSnapshot.opening.body,
+        content.opening.body,
+      ),
+    },
+    {
+      label: "Closing",
+      status: statusForText(
+        initialSnapshot.closing.body,
+        content.closing.body,
+      ),
+    },
+    {
+      label: "Homework",
+      status: statusForText(
+        initialHomework?.body ?? "",
+        homework?.body ?? "",
+      ),
+    },
+    {
+      label: "Work Time bodies",
+      status: workBodiesFilled
+        ? statusForText(
+            initialSnapshot.workTimes.map((w) => w.body).join("\n"),
+            content.workTimes.map((w) => w.body).join("\n"),
+          )
+        : "empty",
+    },
+  ];
+
+  function onWorkTimeCountDraftChange(event: ChangeEvent<HTMLInputElement>) {
+    // Digits only; never resize while typing (avoids clamp-to-1/8 on clear).
+    setWorkTimeCountDraft(event.target.value.replace(/\D/g, "").slice(0, 1));
   }
 
-  return (
-    <form action={saveLessonPlanAction} className="space-y-6">
-      <input type="hidden" name="lessonId" value={lessonId} />
-      <input type="hidden" name="contentJson" value={JSON.stringify(content)} />
-      <input type="hidden" name="freeTextAsks" value={freeTextAsks} />
-      <input type="hidden" name="moduleLabel" value={moduleLabel} />
-      <input type="hidden" name="unitLabel" value={unitLabel} />
-      <input type="hidden" name="lessonLabel" value={lessonLabel} />
+  function commitWorkTimeCount() {
+    const count = Number(workTimeCountDraft);
+    if (!Number.isInteger(count) || count < 1 || count > 8) {
+      setWorkTimeCountDraft(String(Math.max(1, content.workTimes.length)));
+      return;
+    }
+    setWorkTimeCountDraft(String(count));
+    setContent((prev) => resizeWorkTimes(prev, count));
+  }
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Lesson details</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  function setExtraBody(index: number, body: string) {
+    setContent((prev) => ({
+      ...prev,
+      extras: prev.extras.map((item, i) =>
+        i === index ? { ...item, body } : item,
+      ),
+    }));
+  }
+
+  const preview = (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Live preview
+        </p>
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">
+          {moduleLabel || unitLabel || lessonLabel
+            ? [
+                moduleLabel ? `Module ${moduleLabel}` : null,
+                unitLabel ? `Unit ${unitLabel}` : null,
+                lessonLabel ? `Lesson ${lessonLabel}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : "Lesson draft"}
+        </h2>
+        {content.lessonDate ? (
+          <p className="mt-1 text-sm text-slate-500">{content.lessonDate}</p>
+        ) : null}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          From this upload
+        </p>
+        <ul className="mt-3 space-y-2">
+          {provenance.map((item) => (
+            <li
+              key={item.label}
+              className="flex items-center justify-between gap-3 text-sm text-slate-700"
+            >
+              <span>{item.label}</span>
+              <StatusBadge status={item.status} />
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs leading-5 text-slate-500">
+          Opening, Closing, Homework, and Work Time are starting text from the
+          framework — edit freely. Work Time count/minutes can be adjusted too.
+        </p>
+      </div>
+
+      <article className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <PreviewSection title="Standards" empty={standardsCodes.length === 0}>
+          <div className="flex flex-wrap gap-2">
+            {standardsCodes.map((code) => (
+              <span
+                key={code}
+                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+              >
+                {code}
+              </span>
+            ))}
+          </div>
+        </PreviewSection>
+
+        <PreviewSection
+          title="Learning Targets"
+          empty={!normalize(learningTargets?.body ?? "")}
+        >
+          {learningTargets?.body}
+        </PreviewSection>
+
+        <PreviewSection title="Agenda" empty={!normalize(content.agenda)}>
+          {content.agenda}
+        </PreviewSection>
+
+        <PreviewSection
+          title="Entrance Ticket"
+          empty={!normalize(content.entranceTicket)}
+        >
+          {content.entranceTicket}
+        </PreviewSection>
+
+        <PreviewSection
+          title="Vocabulary"
+          empty={!normalize(content.vocabulary)}
+        >
+          {content.vocabulary}
+        </PreviewSection>
+
+        <StandardRubricPreview />
+
+        <PreviewSection title="Materials" empty={!normalize(content.materials)}>
+          {content.materials}
+        </PreviewSection>
+
+        <PreviewSection
+          title={content.opening.label || "Opening"}
+          empty={!normalize(content.opening.body)}
+          minutes={content.opening.minutes}
+        >
+          {content.opening.body}
+        </PreviewSection>
+
+        {content.workTimes.map((wt) => (
+          <PreviewSection
+            key={wt.key}
+            title={wt.label || `Work Time ${wt.key}`}
+            empty={!normalize(wt.body)}
+            minutes={wt.minutes}
+          >
+            {wt.body}
+          </PreviewSection>
+        ))}
+
+        <PreviewSection
+          title={content.closing.label || "Closing"}
+          empty={!normalize(content.closing.body)}
+          minutes={content.closing.minutes}
+        >
+          {content.closing.body}
+        </PreviewSection>
+
+        <PreviewSection
+          title="Homework"
+          empty={!normalize(homework?.body ?? "")}
+        >
+          {homework?.body}
+        </PreviewSection>
+
+        {otherExtras.map(({ extra }) => (
+          <PreviewSection
+            key={extra.label}
+            title={extra.label}
+            empty={!normalize(extra.body)}
+          >
+            {extra.body}
+          </PreviewSection>
+        ))}
+      </article>
+    </div>
+  );
+
+  const editor = (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Edit fields</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          Changes update the preview immediately. Save when you&apos;re ready.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className={labelClass}>Date</span>
             <input
@@ -101,171 +515,371 @@ export function LessonPlanEditor({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className={labelClass}>Standards</span>
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Standards (codes)"
+          status={statusForText(initialSnapshot.standards, content.standards)}
+          hint="Codes only — comma-separated"
+        />
+        {standardsCodes.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {standardsCodes.map((code) => (
+              <span
+                key={code}
+                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+              >
+                {code}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <input
+          className={inputClass}
+          value={content.standards}
+          onChange={(e) =>
+            setContent((prev) => ({ ...prev, standards: e.target.value }))
+          }
+          placeholder="8R1, 8R6, RST3"
+        />
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Learning Targets"
+          status={statusForText(
+            initialTargets?.body ?? "",
+            learningTargets?.body ?? "",
+          )}
+        />
+        {learningTargets ? (
           <textarea
             className={textareaClass}
-            value={content.standards}
-            onChange={(e) =>
-              setContent((prev) => ({ ...prev, standards: e.target.value }))
-            }
+            value={learningTargets.body}
+            onChange={(e) => setExtraBody(learningTargets.index, e.target.value)}
           />
-        </label>
-        <label className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className={labelClass}>Agenda</span>
-          <textarea
-            className={textareaClass}
-            value={content.agenda}
-            onChange={(e) =>
-              setContent((prev) => ({ ...prev, agenda: e.target.value }))
-            }
-          />
-        </label>
-        <label className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className={labelClass}>Materials</span>
-          <textarea
-            className={textareaClass}
-            value={content.materials}
-            onChange={(e) =>
-              setContent((prev) => ({ ...prev, materials: e.target.value }))
-            }
-          />
-        </label>
-        <label className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className={labelClass}>Work Time blocks</span>
-          <input
-            type="number"
-            min={1}
-            max={8}
-            className={inputClass}
-            value={content.workTimes.length}
-            onChange={onWorkTimeCountChange}
-          />
-          <p className="mt-2 text-xs text-slate-500">
-            1–8 blocks. Reducing count drops the last blocks only.
+        ) : (
+          <p className="text-sm text-slate-500">
+            None detected from this upload.
           </p>
-        </label>
+        )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
-        <label className="block">
-          <span className={labelClass}>Opening label</span>
-          <input
-            className={inputClass}
-            value={content.opening.label}
-            onChange={(e) =>
-              setContent((prev) => ({
-                ...prev,
-                opening: { ...prev.opening, label: e.target.value },
-              }))
-            }
-          />
-        </label>
-        <label className="block">
-          <span className={labelClass}>Opening</span>
-          <textarea
-            className={`${textareaClass} min-h-36`}
-            value={content.opening.body}
-            onChange={(e) =>
-              setContent((prev) => ({
-                ...prev,
-                opening: { ...prev.opening, body: e.target.value },
-              }))
-            }
-          />
-        </label>
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Agenda"
+          status={statusForText(initialSnapshot.agenda, content.agenda)}
+        />
+        <textarea
+          className={textareaClass}
+          value={content.agenda}
+          onChange={(e) =>
+            setContent((prev) => ({ ...prev, agenda: e.target.value }))
+          }
+        />
       </div>
 
-      {content.workTimes.map((wt, index) => (
-        <div
-          key={wt.key}
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3"
-        >
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Entrance Ticket"
+          status={statusForText(
+            initialSnapshot.entranceTicket,
+            content.entranceTicket,
+          )}
+          hint="Student-facing prompt from the framework"
+        />
+        <textarea
+          className={textareaClass}
+          value={content.entranceTicket}
+          onChange={(e) =>
+            setContent((prev) => ({
+              ...prev,
+              entranceTicket: e.target.value,
+            }))
+          }
+          placeholder="Entrance ticket question…"
+        />
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Vocabulary"
+          status={statusForText(
+            initialSnapshot.vocabulary,
+            content.vocabulary,
+          )}
+          hint="Usually kept as-is from the framework"
+        />
+        <textarea
+          className={textareaClass}
+          value={content.vocabulary}
+          onChange={(e) =>
+            setContent((prev) => ({ ...prev, vocabulary: e.target.value }))
+          }
+          placeholder="Academic / domain vocabulary…"
+        />
+      </div>
+
+      <div className="space-y-2 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-5 shadow-sm">
+        <FieldHeader
+          title="Classwork / Homework Rubric"
+          status="fixed"
+          hint="Mandated formula block — same every lesson"
+        />
+        <p className="text-sm text-slate-600">
+          Shown above Materials in the preview. Not editable here.
+        </p>
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Materials"
+          status={statusForText(initialSnapshot.materials, content.materials)}
+        />
+        <textarea
+          className={textareaClass}
+          value={content.materials}
+          onChange={(e) =>
+            setContent((prev) => ({ ...prev, materials: e.target.value }))
+          }
+        />
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Opening"
+          status={statusForText(
+            initialSnapshot.opening.body,
+            content.opening.body,
+          )}
+          hint="Starting text from the framework — rewrite in your voice"
+        />
+        <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
           <label className="block">
-            <span className={labelClass}>Work Time {wt.key} label</span>
+            <span className={labelClass}>Label</span>
             <input
               className={inputClass}
-              value={wt.label}
-              onChange={(e) => {
-                const label = e.target.value;
+              value={content.opening.label}
+              onChange={(e) =>
                 setContent((prev) => ({
                   ...prev,
-                  workTimes: prev.workTimes.map((block, i) =>
-                    i === index ? { ...block, label } : block,
-                  ),
-                }));
-              }}
+                  opening: { ...prev.opening, label: e.target.value },
+                }))
+              }
             />
           </label>
           <label className="block">
-            <span className={labelClass}>Work Time {wt.key}</span>
-            <textarea
-              className={`${textareaClass} min-h-36`}
-              value={wt.body}
-              onChange={(e) => {
-                const body = e.target.value;
+            <span className={labelClass}>Minutes</span>
+            <input
+              type="number"
+              min={0}
+              className={inputClass}
+              value={minutesInputValue(content.opening.minutes)}
+              onChange={(e) =>
                 setContent((prev) => ({
                   ...prev,
-                  workTimes: prev.workTimes.map((block, i) =>
-                    i === index ? { ...block, body } : block,
-                  ),
-                }));
-              }}
+                  opening: {
+                    ...prev.opening,
+                    minutes: parseMinutesInput(e.target.value),
+                  },
+                }))
+              }
             />
           </label>
         </div>
-      ))}
-
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
-        <label className="block">
-          <span className={labelClass}>Closing label</span>
-          <input
-            className={inputClass}
-            value={content.closing.label}
-            onChange={(e) =>
-              setContent((prev) => ({
-                ...prev,
-                closing: { ...prev.closing, label: e.target.value },
-              }))
-            }
-          />
-        </label>
-        <label className="block">
-          <span className={labelClass}>Closing</span>
-          <textarea
-            className={`${textareaClass} min-h-36`}
-            value={content.closing.body}
-            onChange={(e) =>
-              setContent((prev) => ({
-                ...prev,
-                closing: { ...prev.closing, body: e.target.value },
-              }))
-            }
-          />
-        </label>
+        <textarea
+          className={`${textareaClass} min-h-36`}
+          value={content.opening.body}
+          onChange={(e) =>
+            setContent((prev) => ({
+              ...prev,
+              opening: { ...prev.opening, body: e.target.value },
+            }))
+          }
+        />
       </div>
 
-      {content.extras.length > 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 space-y-4">
+      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Work Time"
+          status={
+            workBodiesFilled
+              ? statusForText(
+                  initialSnapshot.workTimes.map((w) => w.body).join("\n"),
+                  content.workTimes.map((w) => w.body).join("\n"),
+                )
+              : "empty"
+          }
+          hint={`Pre-filled from the framework (${content.workTimes.length} block(s)) — edit label, minutes, or description anytime.`}
+        />
+        <label className="block max-w-32">
+          <span className={labelClass}>Block count</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[1-8]"
+            autoComplete="off"
+            className={inputClass}
+            value={workTimeCountDraft}
+            onChange={onWorkTimeCountDraftChange}
+            onBlur={commitWorkTimeCount}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitWorkTimeCount();
+              }
+            }}
+          />
+          <p className="mt-1 text-[11px] text-slate-500">1–8 · applies on blur</p>
+        </label>
+        {content.workTimes.map((wt, index) => (
+          <div key={wt.key} className="space-y-2 border-t border-slate-100 pt-4">
+            <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
+              <label className="block">
+                <span className={labelClass}>Work Time {wt.key} label</span>
+                <input
+                  className={inputClass}
+                  value={wt.label}
+                  onChange={(e) => {
+                    const label = e.target.value;
+                    setContent((prev) => ({
+                      ...prev,
+                      workTimes: prev.workTimes.map((block, i) =>
+                        i === index ? { ...block, label } : block,
+                      ),
+                    }));
+                  }}
+                />
+              </label>
+              <label className="block">
+                <span className={labelClass}>Minutes</span>
+                <input
+                  type="number"
+                  min={0}
+                  className={inputClass}
+                  value={minutesInputValue(wt.minutes)}
+                  onChange={(e) => {
+                    const minutes = parseMinutesInput(e.target.value);
+                    setContent((prev) => ({
+                      ...prev,
+                      workTimes: prev.workTimes.map((block, i) =>
+                        i === index ? { ...block, minutes } : block,
+                      ),
+                    }));
+                  }}
+                />
+              </label>
+            </div>
+            <label className="block">
+              <span className={labelClass}>
+                Work Time {wt.key} description
+              </span>
+              <textarea
+                className={`${textareaClass} min-h-36`}
+                value={wt.body}
+                placeholder="Work Time instructional steps…"
+                onChange={(e) => {
+                  const body = e.target.value;
+                  setContent((prev) => ({
+                    ...prev,
+                    workTimes: prev.workTimes.map((block, i) =>
+                      i === index ? { ...block, body } : block,
+                    ),
+                  }));
+                }}
+              />
+            </label>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Closing"
+          status={statusForText(
+            initialSnapshot.closing.body,
+            content.closing.body,
+          )}
+          hint="Starting text from the framework — rewrite in your voice"
+        />
+        <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
+          <label className="block">
+            <span className={labelClass}>Label</span>
+            <input
+              className={inputClass}
+              value={content.closing.label}
+              onChange={(e) =>
+                setContent((prev) => ({
+                  ...prev,
+                  closing: { ...prev.closing, label: e.target.value },
+                }))
+              }
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Minutes</span>
+            <input
+              type="number"
+              min={0}
+              className={inputClass}
+              value={minutesInputValue(content.closing.minutes)}
+              onChange={(e) =>
+                setContent((prev) => ({
+                  ...prev,
+                  closing: {
+                    ...prev.closing,
+                    minutes: parseMinutesInput(e.target.value),
+                  },
+                }))
+              }
+            />
+          </label>
+        </div>
+        <textarea
+          className={`${textareaClass} min-h-36`}
+          value={content.closing.body}
+          onChange={(e) =>
+            setContent((prev) => ({
+              ...prev,
+              closing: { ...prev.closing, body: e.target.value },
+            }))
+          }
+        />
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Homework"
+          status={statusForText(
+            initialHomework?.body ?? "",
+            homework?.body ?? "",
+          )}
+          hint="Starting text from the framework — adjust as needed"
+        />
+        {homework ? (
+          <textarea
+            className={textareaClass}
+            value={homework.body}
+            onChange={(e) => setExtraBody(homework.index, e.target.value)}
+          />
+        ) : (
+          <p className="text-sm text-slate-500">
+            None detected from this upload.
+          </p>
+        )}
+      </div>
+
+      {otherExtras.length > 0 ? (
+        <div className="space-y-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
           <h2 className="text-sm font-semibold text-slate-900">
-            Extra parsed sections
+            Other parsed sections
           </h2>
-          {content.extras.map((extra, index) => (
+          {otherExtras.map(({ extra, index }) => (
             <label key={`${extra.label}-${index}`} className="block">
               <span className={labelClass}>{extra.label}</span>
               <textarea
                 className={textareaClass}
                 value={extra.body}
-                onChange={(e) => {
-                  const body = e.target.value;
-                  setContent((prev) => ({
-                    ...prev,
-                    extras: prev.extras.map((item, i) =>
-                      i === index ? { ...item, body } : item,
-                    ),
-                  }));
-                }}
+                onChange={(e) => setExtraBody(index, e.target.value)}
               />
             </label>
           ))}
@@ -286,14 +900,76 @@ export function LessonPlanEditor({
           Free-form asks for Ticket 7 AI generation. Saved on this draft now.
         </p>
       </div>
+    </div>
+  );
 
-      <div className="flex items-center justify-end gap-3">
-        <PendingSubmitButton
-          idleLabel="Save draft"
-          pendingLabel="Saving…"
-          className={buttonClass}
-        />
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 lg:hidden">
+          <button
+            type="button"
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              mobilePane === "preview"
+                ? "bg-slate-900 text-white"
+                : "text-slate-600"
+            }`}
+            onClick={() => setMobilePane("preview")}
+          >
+            Preview
+          </button>
+          <button
+            type="button"
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              mobilePane === "edit" ? "bg-slate-900 text-white" : "text-slate-600"
+            }`}
+            onClick={() => setMobilePane("edit")}
+          >
+            Edit
+          </button>
+        </div>
+        <div className="ml-auto">
+          <DeleteLessonDraftButton
+            lessonId={lessonId}
+            draftTitle={draftTitle}
+            variant="button"
+          />
+        </div>
       </div>
-    </form>
+
+      <form action={saveLessonPlanAction} className="space-y-4">
+        <input type="hidden" name="lessonId" value={lessonId} />
+        <input
+          type="hidden"
+          name="contentJson"
+          value={JSON.stringify(content)}
+        />
+        <input type="hidden" name="freeTextAsks" value={freeTextAsks} />
+        <input type="hidden" name="moduleLabel" value={moduleLabel} />
+        <input type="hidden" name="unitLabel" value={unitLabel} />
+        <input type="hidden" name="lessonLabel" value={lessonLabel} />
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div
+            className={`lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto ${
+              mobilePane === "preview" ? "block" : "hidden lg:block"
+            }`}
+          >
+            {preview}
+          </div>
+          <div className={mobilePane === "edit" ? "block" : "hidden lg:block"}>
+            {editor}
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <PendingSubmitButton
+            idleLabel="Save draft"
+            pendingLabel="Saving…"
+            className={buttonClass}
+          />
+        </div>
+      </form>
+    </div>
   );
 }

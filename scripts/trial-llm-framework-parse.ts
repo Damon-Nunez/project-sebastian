@@ -96,19 +96,25 @@ async function main() {
     JSON.stringify(
       {
         standards: populaterContent.standards,
+        entranceTicketPreview: populaterContent.entranceTicket.slice(0, 240),
+        vocabularyPreview: populaterContent.vocabulary.slice(0, 280),
         agendaPreview: populaterContent.agenda.slice(0, 400),
         agendaChars: populaterContent.agenda.length,
         openingLabel: populaterContent.opening.label,
+        openingMinutes: populaterContent.opening.minutes,
         openingBodyChars: populaterContent.opening.body.length,
         openingPreview: populaterContent.opening.body.slice(0, 300),
         closingLabel: populaterContent.closing.label,
+        closingMinutes: populaterContent.closing.minutes,
         closingBodyChars: populaterContent.closing.body.length,
         closingPreview: populaterContent.closing.body.slice(0, 300),
         materialsChars: populaterContent.materials.length,
         workTimes: populaterContent.workTimes.map((w) => ({
           key: w.key,
           label: w.label,
+          minutes: w.minutes,
           bodyChars: w.body.length,
+          bodyPreview: w.body.slice(0, 160),
         })),
         extras: populaterContent.extras.map((e) => ({
           label: e.label,
