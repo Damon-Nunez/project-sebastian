@@ -21,10 +21,10 @@ import {
   uploadLessonPlanImage,
 } from "@/lib/lessons/images";
 import {
-  removeLessonWorksheet,
-  uploadLessonWorksheet,
-} from "@/lib/lessons/worksheets";
-import type { LessonWorksheetRow } from "@/lib/db/types";
+  addLessonPlanLink,
+  InvalidLessonLinkError,
+  removeLessonPlanLink,
+} from "@/lib/lessons/links";
 
 function formString(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -245,82 +245,105 @@ export async function removeLessonImageAction(
   }
 }
 
-export type LessonWorksheetActionResult =
+export type LessonLinkActionResult =
   | {
       ok: true;
-      worksheet?: LessonWorksheetRow;
-      signedUrl?: string | null;
-      worksheets?: LessonWorksheetRow[];
+      linkId?: string;
+      content: ReturnType<typeof parseLessonPlanContent>;
     }
   | { ok: false; error: LessonErrorCode };
 
-export async function uploadLessonWorksheetAction(
+export async function addLessonPlanLinkAction(
   formData: FormData,
-): Promise<LessonWorksheetActionResult> {
+): Promise<LessonLinkActionResult> {
   const teacher = await getCurrentTeacher();
   const lessonId = formString(formData, "lessonId");
+  const sectionKey = formString(formData, "sectionKey").trim();
   const caption = formString(formData, "caption").trim();
-  const file = formData.get("file");
+  const url = formString(formData, "url").trim();
 
   if (!lessonId) {
     return { ok: false, error: "missing_lesson" };
   }
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "missing_image" };
+  if (!url) {
+    return { ok: false, error: "missing_link" };
   }
-  if (!isAllowedLessonImageMime(file.type || "")) {
-    return { ok: false, error: "invalid_image" };
-  }
-  if (file.size > MAX_LESSON_IMAGE_BYTES) {
-    return { ok: false, error: "image_too_large" };
+  if (!sectionKey) {
+    return { ok: false, error: "invalid_link_section" };
   }
 
   try {
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const { row, signedUrl } = await uploadLessonWorksheet({
+    let draftContent;
+    try {
+      const raw = formString(formData, "contentJson");
+      if (raw) draftContent = parseLessonPlanContent(JSON.parse(raw));
+    } catch {
+      draftContent = undefined;
+    }
+
+    const result = await addLessonPlanLink({
       teacherId: teacher.id,
       lessonPlanId: lessonId,
-      filename: file.name || "worksheet.png",
-      mimeType: file.type,
-      bytes,
+      url,
+      sectionKey,
       caption,
+      draftContent,
     });
     revalidatePath(`/lessons/${lessonId}`);
-    return { ok: true, worksheet: row, signedUrl };
+    return {
+      ok: true,
+      linkId: result.link.id,
+      content: result.content,
+    };
   } catch (error) {
-    console.error("uploadLessonWorksheetAction failed", error);
+    console.error("addLessonPlanLinkAction failed", error);
+    if (error instanceof InvalidLessonLinkError) {
+      return { ok: false, error: "invalid_link" };
+    }
     const message = error instanceof Error ? error.message : "";
+    if (message.includes("Invalid link section")) {
+      return { ok: false, error: "invalid_link_section" };
+    }
     if (message.includes("not found")) {
       return { ok: false, error: "missing_lesson" };
     }
-    return { ok: false, error: "worksheet_upload_failed" };
+    return { ok: false, error: "link_add_failed" };
   }
 }
 
-export async function removeLessonWorksheetAction(
+export async function removeLessonPlanLinkAction(
   formData: FormData,
-): Promise<LessonWorksheetActionResult> {
+): Promise<LessonLinkActionResult> {
   const teacher = await getCurrentTeacher();
   const lessonId = formString(formData, "lessonId");
-  const worksheetId = formString(formData, "worksheetId").trim();
+  const linkId = formString(formData, "linkId").trim();
 
   if (!lessonId) {
     return { ok: false, error: "missing_lesson" };
   }
-  if (!worksheetId) {
-    return { ok: false, error: "worksheet_remove_failed" };
+  if (!linkId) {
+    return { ok: false, error: "link_remove_failed" };
   }
 
   try {
-    await removeLessonWorksheet({
+    let draftContent;
+    try {
+      const raw = formString(formData, "contentJson");
+      if (raw) draftContent = parseLessonPlanContent(JSON.parse(raw));
+    } catch {
+      draftContent = undefined;
+    }
+
+    const content = await removeLessonPlanLink({
       teacherId: teacher.id,
       lessonPlanId: lessonId,
-      worksheetId,
+      linkId,
+      draftContent,
     });
     revalidatePath(`/lessons/${lessonId}`);
-    return { ok: true };
+    return { ok: true, content };
   } catch (error) {
-    console.error("removeLessonWorksheetAction failed", error);
-    return { ok: false, error: "worksheet_remove_failed" };
+    console.error("removeLessonPlanLinkAction failed", error);
+    return { ok: false, error: "link_remove_failed" };
   }
 }

@@ -1,4 +1,8 @@
-import type { LessonPlanContent, LessonPlanImage } from "./content";
+import type {
+  LessonPlanContent,
+  LessonPlanImage,
+  LessonPlanLink,
+} from "./content";
 
 export type ImageSectionOption = {
   key: string;
@@ -34,6 +38,8 @@ export function imageSectionOptionsForContent(
     label: content.closing.label || "Closing",
   });
   options.push({ key: "homework", label: "Homework" });
+  options.push({ key: "worksheets", label: "Worksheets" });
+  options.push({ key: "anchorCharts", label: "Anchor Charts" });
 
   return options;
 }
@@ -43,4 +49,13 @@ export function imagesForSection(
   sectionKey: string,
 ): LessonPlanImage[] {
   return (content.images ?? []).filter((img) => img.sectionKey === sectionKey);
+}
+
+export function linksForSection(
+  content: LessonPlanContent,
+  sectionKey: string,
+): LessonPlanLink[] {
+  return (content.lessonPlanLinks ?? []).filter(
+    (link) => link.sectionKey === sectionKey,
+  );
 }

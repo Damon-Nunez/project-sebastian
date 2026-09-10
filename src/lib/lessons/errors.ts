@@ -20,6 +20,11 @@ export const LESSON_ERROR_MESSAGES = {
   image_remove_failed: "Could not remove that image. Please try again.",
   worksheet_upload_failed: "Worksheet upload failed. Please try again.",
   worksheet_remove_failed: "Could not remove that worksheet. Please try again.",
+  missing_link: "Paste a video or resource URL.",
+  invalid_link: "That doesn’t look like a valid http(s) URL.",
+  invalid_link_section: "Pick a section for the link.",
+  link_add_failed: "Could not add that link. Please try again.",
+  link_remove_failed: "Could not remove that link. Please try again.",
 } as const;
 
 export type LessonErrorCode = keyof typeof LESSON_ERROR_MESSAGES;

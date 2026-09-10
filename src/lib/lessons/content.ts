@@ -42,7 +42,7 @@ const workTimeBlockSchema = z.object({
 
 /**
  * Section attachment target for an uploaded image.
- * Examples: "opening", "closing", "materials", "workTime:A", "homework", "general"
+ * Examples: "opening", "closing", "materials", "workTime:A", "homework", "worksheets", "anchorCharts", "general"
  */
 export const lessonPlanImageSchema = z.object({
   id: z.string().min(1),
@@ -51,6 +51,20 @@ export const lessonPlanImageSchema = z.object({
   originalFilename: z.string().min(1),
   mimeType: z.string().min(1),
   caption: z.string().default(""),
+});
+
+/**
+ * Teacher-pasted links (usually video) attached to a plan section.
+ * Metadata only in content JSON — not a separate DB table.
+ */
+export const lessonPlanLinkSchema = z.object({
+  id: z.string().min(1),
+  sectionKey: z.string().min(1),
+  url: z.string().min(1),
+  thumbnailUrl: z.string().default(""),
+  title: z.string().default(""),
+  caption: z.string().default(""),
+  provider: z.enum(["youtube", "vimeo", "other"]).default("other"),
 });
 
 /** YYYY-MM-DD or null (unset). */
@@ -87,11 +101,17 @@ export const lessonPlanContentSchema = z.object({
    * Files live in Storage; this is metadata only.
    */
   images: z.array(lessonPlanImageSchema).default([]),
+  /**
+   * Pasted links (videos / resources) attached to a section.
+   * Thumbnail URLs are resolved when the link is added.
+   */
+  lessonPlanLinks: z.array(lessonPlanLinkSchema).default([]),
 });
 
 export type LabeledBlock = z.infer<typeof labeledBlockSchema>;
 export type WorkTimeBlock = z.infer<typeof workTimeBlockSchema>;
 export type LessonPlanImage = z.infer<typeof lessonPlanImageSchema>;
+export type LessonPlanLink = z.infer<typeof lessonPlanLinkSchema>;
 export type LessonPlanContent = z.infer<typeof lessonPlanContentSchema>;
 
 const WORK_TIME_KEYS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -237,6 +257,7 @@ export function emptyLessonPlanContent(
     closing: emptyLabeledBlock("Closing"),
     extras: [],
     images: [],
+    lessonPlanLinks: [],
   };
 }
 
