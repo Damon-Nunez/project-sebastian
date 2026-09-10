@@ -4,7 +4,12 @@ import { LessonPlanEditor } from "@/components/LessonPlanEditor";
 import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { lessonErrorMessage } from "@/lib/lessons/errors";
+import { signLessonPlanImages } from "@/lib/lessons/images";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
+import {
+  listLessonWorksheets,
+  signLessonWorksheets,
+} from "@/lib/lessons/worksheets";
 
 type LessonPageProps = {
   params: Promise<{ lessonId: string }>;
@@ -26,6 +31,21 @@ export default async function LessonDetailPage({
   }
 
   const content = parseLessonPlanContent(plan.content);
+  const imageUrls = await signLessonPlanImages(content);
+
+  let worksheets: Awaited<ReturnType<typeof listLessonWorksheets>> = [];
+  let worksheetUrls: Record<string, string> = {};
+  try {
+    worksheets = await listLessonWorksheets({
+      teacherId: teacher.id,
+      lessonPlanId: plan.id,
+    });
+    worksheetUrls = await signLessonWorksheets(worksheets);
+  } catch (listError) {
+    // Table may not be migrated yet — keep draft usable with empty worksheets.
+    console.error("lesson worksheets load failed", listError);
+  }
+
   const titleBits = [
     plan.module_label ? `Module ${plan.module_label}` : null,
     plan.unit_label ? `Unit ${plan.unit_label}` : null,
@@ -48,8 +68,8 @@ export default async function LessonDetailPage({
           {draftTitle === "Untitled draft" ? "Lesson draft" : draftTitle}
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          Left: live lesson preview and what came from the upload. Right: edit
-          fields (Work Time bodies are yours). Save when it looks right.
+          Left: reference preview (swap Simplified / Original). Right: edit the
+          draft, add images under a section, then save.
         </p>
       </div>
 
@@ -79,6 +99,9 @@ export default async function LessonDetailPage({
         initialModuleLabel={plan.module_label ?? ""}
         initialUnitLabel={plan.unit_label ?? ""}
         initialLessonLabel={plan.lesson_label ?? ""}
+        initialImageUrls={imageUrls}
+        initialWorksheets={worksheets}
+        initialWorksheetUrls={worksheetUrls}
       />
     </section>
   );

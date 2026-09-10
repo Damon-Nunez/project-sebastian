@@ -253,7 +253,7 @@ export async function deleteLessonPlanForTeacher(
 
   const { data: existing, error: lookupError } = await admin
     .from("lesson_plans")
-    .select("id")
+    .select("id, content")
     .eq("teacher_id", teacherId)
     .eq("id", lessonPlanId)
     .maybeSingle();
@@ -264,6 +264,16 @@ export async function deleteLessonPlanForTeacher(
   if (!existing) {
     throw new Error("Lesson plan not found");
   }
+
+  const { deleteAllLessonPlanImages } = await import("./images");
+  await deleteAllLessonPlanImages({
+    teacherId,
+    lessonPlanId,
+    content: (existing as { content: unknown }).content,
+  });
+
+  const { deleteAllLessonWorksheets } = await import("./worksheets");
+  await deleteAllLessonWorksheets({ teacherId, lessonPlanId });
 
   const { error: docsError } = await admin
     .from("documents")

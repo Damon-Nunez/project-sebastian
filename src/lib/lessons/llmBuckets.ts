@@ -2,9 +2,9 @@ import { z } from "zod";
 import {
   emptyLessonPlanContent,
   emptyWorkTimeBlock,
+  formatWorkTimeLabel,
   withBodyVariants,
   type LessonPlanContent,
-  workTimeKeyForIndex,
 } from "./content";
 
 /**
@@ -119,13 +119,10 @@ export function bucketsToLessonPlanContent(
       ? []
       : buckets.workTimes.map((wt, i) => {
           const block = emptyWorkTimeBlock(i);
-          const title = wt.title.trim();
           const variants = withBodyVariants(wt.body, wt.bodySimplified);
           return {
             ...block,
-            label: title
-              ? `Work Time ${workTimeKeyForIndex(i)}: ${title}`
-              : block.label,
+            label: formatWorkTimeLabel(i, wt.title),
             minutes: wt.minutes,
             ...variants,
           };

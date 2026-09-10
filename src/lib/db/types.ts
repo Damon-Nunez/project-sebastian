@@ -92,6 +92,18 @@ export type DocumentRow = {
   updated_at: string;
 };
 
+export type LessonWorksheetRow = {
+  id: string;
+  teacher_id: string;
+  lesson_plan_id: string;
+  original_filename: string;
+  storage_path: string;
+  mime_type: string;
+  caption: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type GradingSessionRow = {
   id: string;
   teacher_id: string;
@@ -130,6 +142,7 @@ export const DOMAIN_TABLES = [
   "rubrics",
   "lesson_plans",
   "documents",
+  "lesson_worksheets",
   "grading_sessions",
   "grading_suggestions",
 ] as const;

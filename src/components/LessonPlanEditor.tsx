@@ -1,15 +1,27 @@
 "use client";
 
 import { useState, type ChangeEvent, type ReactNode } from "react";
-import { saveLessonPlanAction } from "@/app/lessons/actions";
+import {
+  removeLessonImageAction,
+  removeLessonWorksheetAction,
+  saveLessonPlanAction,
+  uploadLessonImageAction,
+  uploadLessonWorksheetAction,
+} from "@/app/lessons/actions";
 import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
+import type { LessonWorksheetRow } from "@/lib/db/types";
 import {
   bodyForViewMode,
   resizeWorkTimes,
   type BodyViewMode,
   type LessonPlanContent,
 } from "@/lib/lessons/content";
+import { LESSON_ERROR_MESSAGES, type LessonErrorCode } from "@/lib/lessons/errors";
+import {
+  imageSectionOptionsForContent,
+  imagesForSection,
+} from "@/lib/lessons/imageSections";
 import { STANDARD_CLASSWORK_RUBRIC } from "@/lib/lessons/standardRubric";
 
 type LessonPlanEditorProps = {
@@ -20,6 +32,10 @@ type LessonPlanEditorProps = {
   initialModuleLabel: string;
   initialUnitLabel: string;
   initialLessonLabel: string;
+  /** Signed URLs keyed by image id (from server). */
+  initialImageUrls?: Record<string, string>;
+  initialWorksheets?: LessonWorksheetRow[];
+  initialWorksheetUrls?: Record<string, string>;
 };
 
 type FieldStatus = "from-upload" | "edited" | "empty" | "yours" | "fixed";
@@ -163,6 +179,7 @@ function PreviewSection({
   minutes,
   mode,
   onModeChange,
+  images,
 }: {
   title: string;
   children?: ReactNode;
@@ -170,8 +187,10 @@ function PreviewSection({
   minutes?: number | null;
   mode?: BodyViewMode;
   onModeChange?: (mode: BodyViewMode) => void;
+  images?: { id: string; url: string | undefined; caption: string; filename: string }[];
 }) {
   const time = formatMinutes(minutes);
+  const hasImages = (images?.length ?? 0) > 0;
   return (
     <section className="border-b border-slate-100 pb-4 last:border-b-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -189,13 +208,39 @@ function PreviewSection({
           <ViewModePills value={mode} onChange={onModeChange} size="sm" />
         ) : null}
       </div>
-      {empty ? (
+      {empty && !hasImages ? (
         <p className="mt-2 text-sm italic text-slate-400">Not filled yet</p>
       ) : (
         <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
           {children}
         </div>
       )}
+      {hasImages ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {images!.map((img) => (
+            <figure
+              key={img.id}
+              className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+            >
+              {img.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={img.url}
+                  alt={img.caption || img.filename}
+                  className="max-h-56 w-full object-contain bg-white"
+                />
+              ) : (
+                <p className="p-3 text-xs text-slate-500">{img.filename}</p>
+              )}
+              {(img.caption || img.filename) && (
+                <figcaption className="border-t border-slate-100 px-2.5 py-1.5 text-[11px] text-slate-600">
+                  {img.caption || img.filename}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -258,6 +303,9 @@ export function LessonPlanEditor({
   initialModuleLabel,
   initialUnitLabel,
   initialLessonLabel,
+  initialImageUrls = {},
+  initialWorksheets = [],
+  initialWorksheetUrls = {},
 }: LessonPlanEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [freeTextAsks, setFreeTextAsks] = useState(initialFreeTextAsks);
@@ -274,6 +322,20 @@ export function LessonPlanEditor({
   const [workTimeModes, setWorkTimeModes] = useState<Record<string, BodyViewMode>>(
     {},
   );
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>(initialImageUrls);
+  const [imageSectionKey, setImageSectionKey] = useState("opening");
+  const [imageCaption, setImageCaption] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageMessage, setImageMessage] = useState<string | null>(null);
+  const [worksheets, setWorksheets] =
+    useState<LessonWorksheetRow[]>(initialWorksheets);
+  const [worksheetUrls, setWorksheetUrls] =
+    useState<Record<string, string>>(initialWorksheetUrls);
+  const [worksheetFile, setWorksheetFile] = useState<File | null>(null);
+  const [worksheetCaption, setWorksheetCaption] = useState("");
+  const [worksheetBusy, setWorksheetBusy] = useState(false);
+  const [worksheetMessage, setWorksheetMessage] = useState<string | null>(null);
 
   function workTimeModeFor(key: string): BodyViewMode {
     return workTimeModes[key] ?? "edited";
@@ -310,6 +372,154 @@ export function LessonPlanEditor({
     setAllPreviewModes("edited");
     setMobilePane("preview");
   }
+
+  function previewImages(sectionKey: string) {
+    return imagesForSection(content, sectionKey).map((img) => ({
+      id: img.id,
+      url: imageUrls[img.id],
+      caption: img.caption,
+      filename: img.originalFilename,
+    }));
+  }
+
+  async function onAddImage() {
+    if (!imageFile || imageBusy) return;
+    setImageBusy(true);
+    setImageMessage(null);
+    try {
+      const formData = new FormData();
+      formData.set("lessonId", lessonId);
+      formData.set("sectionKey", imageSectionKey);
+      formData.set("caption", imageCaption);
+      formData.set("contentJson", JSON.stringify(content));
+      formData.set("file", imageFile);
+      const result = await uploadLessonImageAction(formData);
+      if (!result.ok) {
+        setImageMessage(
+          LESSON_ERROR_MESSAGES[result.error as LessonErrorCode] ??
+            "Image upload failed.",
+        );
+        return;
+      }
+      setContent(result.content);
+      if (result.imageId && result.signedUrl) {
+        setImageUrls((prev) => ({
+          ...prev,
+          [result.imageId!]: result.signedUrl!,
+        }));
+      }
+      setImageFile(null);
+      setImageCaption("");
+      setImageMessage("Image added under that section.");
+    } catch (error) {
+      console.error(error);
+      setImageMessage("Image upload failed. Please try again.");
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
+  async function onRemoveImage(imageId: string) {
+    if (imageBusy) return;
+    setImageBusy(true);
+    setImageMessage(null);
+    try {
+      const formData = new FormData();
+      formData.set("lessonId", lessonId);
+      formData.set("imageId", imageId);
+      formData.set("contentJson", JSON.stringify(content));
+      const result = await removeLessonImageAction(formData);
+      if (!result.ok) {
+        setImageMessage(
+          LESSON_ERROR_MESSAGES[result.error as LessonErrorCode] ??
+            "Could not remove that image.",
+        );
+        return;
+      }
+      setContent(result.content);
+      setImageUrls((prev) => {
+        const next = { ...prev };
+        delete next[imageId];
+        return next;
+      });
+      setImageMessage("Image removed.");
+    } catch (error) {
+      console.error(error);
+      setImageMessage("Could not remove that image.");
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
+  async function onAddWorksheet() {
+    if (!worksheetFile || worksheetBusy) return;
+    setWorksheetBusy(true);
+    setWorksheetMessage(null);
+    try {
+      const formData = new FormData();
+      formData.set("lessonId", lessonId);
+      formData.set("caption", worksheetCaption);
+      formData.set("file", worksheetFile);
+      const result = await uploadLessonWorksheetAction(formData);
+      if (!result.ok) {
+        setWorksheetMessage(
+          LESSON_ERROR_MESSAGES[result.error as LessonErrorCode] ??
+            "Worksheet upload failed.",
+        );
+        return;
+      }
+      if (result.worksheet) {
+        setWorksheets((prev) => [...prev, result.worksheet!]);
+        if (result.signedUrl) {
+          setWorksheetUrls((prev) => ({
+            ...prev,
+            [result.worksheet!.id]: result.signedUrl!,
+          }));
+        }
+      }
+      setWorksheetFile(null);
+      setWorksheetCaption("");
+      setWorksheetMessage("Worksheet added.");
+    } catch (error) {
+      console.error(error);
+      setWorksheetMessage("Worksheet upload failed. Please try again.");
+    } finally {
+      setWorksheetBusy(false);
+    }
+  }
+
+  async function onRemoveWorksheet(worksheetId: string) {
+    if (worksheetBusy) return;
+    setWorksheetBusy(true);
+    setWorksheetMessage(null);
+    try {
+      const formData = new FormData();
+      formData.set("lessonId", lessonId);
+      formData.set("worksheetId", worksheetId);
+      const result = await removeLessonWorksheetAction(formData);
+      if (!result.ok) {
+        setWorksheetMessage(
+          LESSON_ERROR_MESSAGES[result.error as LessonErrorCode] ??
+            "Could not remove that worksheet.",
+        );
+        return;
+      }
+      setWorksheets((prev) => prev.filter((w) => w.id !== worksheetId));
+      setWorksheetUrls((prev) => {
+        const next = { ...prev };
+        delete next[worksheetId];
+        return next;
+      });
+      setWorksheetMessage("Worksheet removed.");
+    } catch (error) {
+      console.error(error);
+      setWorksheetMessage("Could not remove that worksheet.");
+    } finally {
+      setWorksheetBusy(false);
+    }
+  }
+
+  const sectionOptions = imageSectionOptionsForContent(content);
 
   const learningTargets = findExtra(content, "Learning Targets");
   const homework = findExtra(content, "Homework");
@@ -493,6 +703,13 @@ export function LessonPlanEditor({
       </div>
 
       <article className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        {previewImages("general").length > 0 ? (
+          <PreviewSection
+            title="General images"
+            images={previewImages("general")}
+          />
+        ) : null}
+
         <PreviewSection title="Standards" empty={standardsCodes.length === 0}>
           <div className="flex flex-wrap gap-2">
             {standardsCodes.map((code) => (
@@ -509,17 +726,23 @@ export function LessonPlanEditor({
         <PreviewSection
           title="Learning Targets"
           empty={!normalize(learningTargets?.body ?? "")}
+          images={previewImages("learningTargets")}
         >
           {learningTargets?.body}
         </PreviewSection>
 
-        <PreviewSection title="Agenda" empty={!normalize(content.agenda)}>
+        <PreviewSection
+          title="Agenda"
+          empty={!normalize(content.agenda)}
+          images={previewImages("agenda")}
+        >
           {content.agenda}
         </PreviewSection>
 
         <PreviewSection
           title="Entrance Ticket"
           empty={!normalize(content.entranceTicket)}
+          images={previewImages("entranceTicket")}
         >
           {content.entranceTicket}
         </PreviewSection>
@@ -527,13 +750,18 @@ export function LessonPlanEditor({
         <PreviewSection
           title="Vocabulary"
           empty={!normalize(content.vocabulary)}
+          images={previewImages("vocabulary")}
         >
           {content.vocabulary}
         </PreviewSection>
 
         <StandardRubricPreview />
 
-        <PreviewSection title="Materials" empty={!normalize(content.materials)}>
+        <PreviewSection
+          title="Materials"
+          empty={!normalize(content.materials)}
+          images={previewImages("materials")}
+        >
           {content.materials}
         </PreviewSection>
 
@@ -543,6 +771,7 @@ export function LessonPlanEditor({
           minutes={content.opening.minutes}
           mode={openingMode}
           onModeChange={setOpeningMode}
+          images={previewImages("opening")}
         >
           {bodyForViewMode(content.opening, openingMode)}
         </PreviewSection>
@@ -558,6 +787,7 @@ export function LessonPlanEditor({
               minutes={wt.minutes}
               mode={mode}
               onModeChange={(next) => setWorkTimeMode(wt.key, next)}
+              images={previewImages(`workTime:${wt.key}`)}
             >
               {text}
             </PreviewSection>
@@ -570,6 +800,7 @@ export function LessonPlanEditor({
           minutes={content.closing.minutes}
           mode={closingMode}
           onModeChange={setClosingMode}
+          images={previewImages("closing")}
         >
           {bodyForViewMode(content.closing, closingMode)}
         </PreviewSection>
@@ -577,9 +808,21 @@ export function LessonPlanEditor({
         <PreviewSection
           title="Homework"
           empty={!normalize(homework?.body ?? "")}
+          images={previewImages("homework")}
         >
           {homework?.body}
         </PreviewSection>
+
+        <PreviewSection
+          title="Worksheets"
+          empty={worksheets.length === 0}
+          images={worksheets.map((w) => ({
+            id: w.id,
+            url: worksheetUrls[w.id],
+            caption: w.caption,
+            filename: w.original_filename,
+          }))}
+        />
 
         {otherExtras.map(({ extra }) => (
           <PreviewSection
@@ -1009,6 +1252,96 @@ export function LessonPlanEditor({
         )}
       </div>
 
+      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Worksheets"
+          status={worksheets.length > 0 ? "edited" : "empty"}
+          hint="Optional handouts for this lesson — upload only (no section picker)."
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Worksheet file</span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
+              className={`${inputClass} file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700`}
+              onChange={(e) => {
+                setWorksheetFile(e.target.files?.[0] ?? null);
+                setWorksheetMessage(null);
+              }}
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Caption (optional)</span>
+            <input
+              className={inputClass}
+              value={worksheetCaption}
+              onChange={(e) => setWorksheetCaption(e.target.value)}
+              placeholder="e.g. Note-catcher page 1"
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={!worksheetFile || worksheetBusy}
+            onClick={() => void onAddWorksheet()}
+          >
+            {worksheetBusy ? "Working…" : "Add worksheet"}
+          </button>
+          {worksheetFile ? (
+            <span className="text-xs text-slate-500">{worksheetFile.name}</span>
+          ) : null}
+        </div>
+        {worksheetMessage ? (
+          <p className="text-xs text-slate-600">{worksheetMessage}</p>
+        ) : null}
+        {worksheets.length > 0 ? (
+          <ul className="space-y-3 border-t border-slate-100 pt-4">
+            {worksheets.map((w) => (
+              <li
+                key={w.id}
+                className="flex flex-wrap items-start gap-3 rounded-lg border border-slate-200 p-3"
+              >
+                {worksheetUrls[w.id] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={worksheetUrls[w.id]}
+                    alt={w.caption || w.original_filename}
+                    className="h-16 w-16 rounded object-cover"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded bg-slate-100 text-[10px] text-slate-500">
+                    No preview
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-900">
+                    {w.original_filename}
+                  </p>
+                  {w.caption ? (
+                    <p className="text-xs text-slate-600">{w.caption}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  disabled={worksheetBusy}
+                  onClick={() => void onRemoveWorksheet(w.id)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-500">
+            No worksheets yet — upload when you have them.
+          </p>
+        )}
+      </div>
+
       {otherExtras.length > 0 ? (
         <div className="space-y-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
           <h2 className="text-sm font-semibold text-slate-900">
@@ -1027,6 +1360,138 @@ export function LessonPlanEditor({
         </div>
       ) : null}
 
+      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <FieldHeader
+          title="Images"
+          status={(content.images?.length ?? 0) > 0 ? "edited" : "empty"}
+          hint="After edits — upload PNG/JPEG/WebP/GIF and pick which section it belongs under (no drag-and-drop)."
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Image file</span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
+              className={`${inputClass} file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700`}
+              onChange={(e) => {
+                const next = e.target.files?.[0] ?? null;
+                setImageFile(next);
+                setImageMessage(null);
+              }}
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Attach under section</span>
+            <select
+              className={inputClass}
+              value={imageSectionKey}
+              onChange={(e) => setImageSectionKey(e.target.value)}
+            >
+              {sectionOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className={labelClass}>Caption (optional)</span>
+            <input
+              className={inputClass}
+              value={imageCaption}
+              onChange={(e) => setImageCaption(e.target.value)}
+              placeholder="Short label for the image"
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={!imageFile || imageBusy}
+            onClick={() => void onAddImage()}
+          >
+            {imageBusy ? "Working…" : "Add image"}
+          </button>
+          {imageFile ? (
+            <span className="text-xs text-slate-500">{imageFile.name}</span>
+          ) : null}
+        </div>
+        {imageMessage ? (
+          <p className="text-xs text-slate-600">{imageMessage}</p>
+        ) : null}
+
+        {(content.images?.length ?? 0) > 0 ? (
+          <ul className="space-y-3 border-t border-slate-100 pt-4">
+            {content.images.map((img) => {
+              const sectionLabel =
+                sectionOptions.find((o) => o.key === img.sectionKey)?.label ??
+                img.sectionKey;
+              return (
+                <li
+                  key={img.id}
+                  className="flex flex-wrap items-start gap-3 rounded-lg border border-slate-200 p-3"
+                >
+                  {imageUrls[img.id] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imageUrls[img.id]}
+                      alt={img.caption || img.originalFilename}
+                      className="h-16 w-16 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded bg-slate-100 text-[10px] text-slate-500">
+                      No preview
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-900">
+                      {img.originalFilename}
+                    </p>
+                    <p className="text-xs text-slate-500">Under: {sectionLabel}</p>
+                    {img.caption ? (
+                      <p className="text-xs text-slate-600">{img.caption}</p>
+                    ) : null}
+                    <label className="mt-2 block max-w-xs">
+                      <span className={labelClass}>Move to section</span>
+                      <select
+                        className={inputClass}
+                        value={img.sectionKey}
+                        onChange={(e) => {
+                          const sectionKey = e.target.value;
+                          setContent((prev) => ({
+                            ...prev,
+                            images: prev.images.map((item) =>
+                              item.id === img.id ? { ...item, sectionKey } : item,
+                            ),
+                          }));
+                        }}
+                      >
+                        {sectionOptions.map((opt) => (
+                          <option key={opt.key} value={opt.key}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    disabled={imageBusy}
+                    onClick={() => void onRemoveImage(img.id)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-500">No images on this draft yet.</p>
+        )}
+      </div>
+
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <label className="block">
           <span className={labelClass}>Extra custom request</span>
@@ -1038,7 +1503,8 @@ export function LessonPlanEditor({
           />
         </label>
         <p className="mt-2 text-xs text-slate-500">
-          Free-form asks for Ticket 7 AI generation. Saved on this draft now.
+          Last step — free-form asks for Ticket 7 AI generation. Saved on this draft
+          now.
         </p>
       </div>
     </div>

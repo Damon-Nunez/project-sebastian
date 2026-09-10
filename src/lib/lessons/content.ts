@@ -40,6 +40,19 @@ const workTimeBlockSchema = z.object({
   bodySimplified: z.string().default(""),
 });
 
+/**
+ * Section attachment target for an uploaded image.
+ * Examples: "opening", "closing", "materials", "workTime:A", "homework", "general"
+ */
+export const lessonPlanImageSchema = z.object({
+  id: z.string().min(1),
+  sectionKey: z.string().min(1),
+  storagePath: z.string().min(1),
+  originalFilename: z.string().min(1),
+  mimeType: z.string().min(1),
+  caption: z.string().default(""),
+});
+
 /** YYYY-MM-DD or null (unset). */
 const lessonDateSchema = z
   .string()
@@ -69,10 +82,16 @@ export const lessonPlanContentSchema = z.object({
   closing: labeledBlockSchema,
   /** Parsed sections that did not map to a known field. */
   extras: z.array(labeledBlockSchema),
+  /**
+   * Teacher-uploaded images attached to a plan section (not drag-placed).
+   * Files live in Storage; this is metadata only.
+   */
+  images: z.array(lessonPlanImageSchema).default([]),
 });
 
 export type LabeledBlock = z.infer<typeof labeledBlockSchema>;
 export type WorkTimeBlock = z.infer<typeof workTimeBlockSchema>;
+export type LessonPlanImage = z.infer<typeof lessonPlanImageSchema>;
 export type LessonPlanContent = z.infer<typeof lessonPlanContentSchema>;
 
 const WORK_TIME_KEYS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -84,13 +103,44 @@ export function workTimeKeyForIndex(index: number): string {
   return WORK_TIME_KEYS[index]!;
 }
 
-/** Build body / bodyOriginal / bodySimplified from parser output. */
+/**
+ * Strip duplicated "Work Time X:" prefixes from an LLM title so we don't get
+ * "Work Time B: Work Time B: Language Dive…".
+ */
+export function cleanWorkTimeTitle(title: string): string {
+  let cleaned = title.trim();
+  // Remove one or more leading "Work Time <letter>" (+ optional punctuation) prefixes.
+  cleaned = cleaned.replace(/^(?:Work\s*Time\s*[A-Z]\s*[:.\-–—]?\s*)+/i, "").trim();
+  if (/^Work\s*Time\s*[A-Z]$/i.test(cleaned)) {
+    return "";
+  }
+  return cleaned;
+}
+
+/** Build display label: `Work Time A` or `Work Time A: Language Dive…`. */
+export function formatWorkTimeLabel(index: number, title: string): string {
+  const key = workTimeKeyForIndex(index);
+  const cleaned = cleanWorkTimeTitle(title);
+  return cleaned ? `Work Time ${key}: ${cleaned}` : `Work Time ${key}`;
+}
+
+/**
+ * Build body / bodyOriginal / bodySimplified from parser output.
+ * Edited (`body`) always starts as a copy of Original — never Simplified.
+ */
 export function withBodyVariants(
   original: string,
   simplified?: string,
 ): Pick<LabeledBlock, "body" | "bodyOriginal" | "bodySimplified"> {
-  const o = original.trim();
-  const s = (simplified ?? "").trim();
+  let o = original.trim();
+  let s = (simplified ?? "").trim();
+
+  // LLM sometimes swaps full vs short — prefer the longer text as Original.
+  if (o && s && s.length > o.length) {
+    const swap = o;
+    o = s;
+    s = swap;
+  }
 
   if (!o) {
     return { body: "", bodyOriginal: "", bodySimplified: "" };
@@ -186,6 +236,7 @@ export function emptyLessonPlanContent(
     workTimesReservoir: [],
     closing: emptyLabeledBlock("Closing"),
     extras: [],
+    images: [],
   };
 }
 
@@ -197,14 +248,12 @@ export function safeParseLessonPlanContent(raw: unknown) {
   return lessonPlanContentSchema.safeParse(raw);
 }
 
-const DEFAULT_WORK_TIME_LABEL = /^Work Time [A-Z]$/i;
-
 function rekeyWorkTimeBlock(block: WorkTimeBlock, index: number): WorkTimeBlock {
   const key = workTimeKeyForIndex(index);
-  const label =
-    !block.label || DEFAULT_WORK_TIME_LABEL.test(block.label)
-      ? `Work Time ${key}`
-      : block.label;
+  const cleanedTitle = cleanWorkTimeTitle(block.label);
+  const label = cleanedTitle
+    ? `Work Time ${key}: ${cleanedTitle}`
+    : `Work Time ${key}`;
   return {
     ...block,
     key,
@@ -217,8 +266,9 @@ function rekeyWorkTimeBlock(block: WorkTimeBlock, index: number): WorkTimeBlock 
 
 /**
  * Grow/shrink Work Time blocks.
- * Shrinking parks removed blocks in workTimesReservoir (keeps Original/Simplified/Edited).
- * Growing restores from the reservoir before creating empty blocks. Re-keys to A, B, C…
+ * Shrinking parks removed blocks that have content in workTimesReservoir.
+ * Empty bodies are dropped (not parked). Growing restores from the reservoir
+ * before creating empty blocks. Re-keys to A, B, C…
  */
 export function resizeWorkTimes(
   content: LessonPlanContent,
@@ -234,7 +284,13 @@ export function resizeWorkTimes(
   if (count < active.length) {
     const removed = active.slice(count);
     active = active.slice(0, count);
-    reservoir.unshift(...removed);
+    const worthKeeping = removed.filter(
+      (block) =>
+        Boolean(block.body.trim()) ||
+        Boolean(block.bodyOriginal?.trim()) ||
+        Boolean(block.bodySimplified?.trim()),
+    );
+    reservoir.unshift(...worthKeeping);
   } else if (count > active.length) {
     while (active.length < count && reservoir.length > 0) {
       active.push(reservoir.shift()!);
@@ -249,7 +305,6 @@ export function resizeWorkTimes(
     workTimes: active.map((block, index) => rekeyWorkTimeBlock(block, index)),
     workTimesReservoir: reservoir.map((block, index) => ({
       ...block,
-      // Keep reservoir keys stable-ish for debugging; UI doesn’t show these.
       key: block.key || workTimeKeyForIndex(index),
       bodyOriginal: block.bodyOriginal ?? "",
       bodySimplified: block.bodySimplified ?? "",

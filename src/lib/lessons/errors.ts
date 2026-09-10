@@ -12,6 +12,14 @@ export const LESSON_ERROR_MESSAGES = {
   invalid_save: "Could not save — the form data was invalid.",
   save_failed: "Save failed. Please try again.",
   delete_failed: "Could not delete that draft. Please try again.",
+  missing_image: "Choose an image file (PNG, JPEG, WebP, or GIF).",
+  invalid_image: "Unsupported image type. Use PNG, JPEG, WebP, or GIF.",
+  image_too_large: "Image is too large (max 5MB).",
+  invalid_image_section: "Pick a section for the image.",
+  image_upload_failed: "Image upload failed. Please try again.",
+  image_remove_failed: "Could not remove that image. Please try again.",
+  worksheet_upload_failed: "Worksheet upload failed. Please try again.",
+  worksheet_remove_failed: "Could not remove that worksheet. Please try again.",
 } as const;
 
 export type LessonErrorCode = keyof typeof LESSON_ERROR_MESSAGES;

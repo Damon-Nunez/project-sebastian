@@ -25,8 +25,9 @@ Rules:
 - materials: materials lists if present; otherwise "".
 - standardsCodes: codes only (e.g. 8R6, RL.8.1, RST3). No prose descriptions.
 - workTimes: one object per Work Time block (A, B, C…). Include short title, minutes from the agenda, AND:
-  - body = full instructional extract for that Work Time (do not leave empty when the framework has content).
-  - bodySimplified = condensed teacher-facing version: must-do steps + questions to ask; drop fluff. If body is already short, set bodySimplified equal to body.
+  - title = short topic only (e.g. "Language Dive: …"). Do NOT repeat "Work Time A" / "Work Time B" in the title — the app adds that prefix.
+  - body = FULL instructional extract for that Work Time (the long source text). Do not put the condensed version in body.
+  - bodySimplified = condensed teacher-facing version: must-do steps + questions to ask; drop fluff. Must be shorter than body when body is long.
   Merge Ongoing Assessment lines that belong to the same lettered Work Time into that block's title or body when helpful.
 - Ignore export noise: slide presentations, page numbers, and generic rubric tables (the app injects a standard rubric separately).
 - Return ONLY valid JSON matching this shape (no markdown fences, no commentary):
