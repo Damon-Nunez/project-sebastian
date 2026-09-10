@@ -3,6 +3,7 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import {
   addLessonPlanLinkAction,
+  polishLessonPlanAction,
   removeLessonImageAction,
   removeLessonPlanLinkAction,
   saveLessonPlanAction,
@@ -1767,13 +1768,35 @@ export function LessonPlanEditor({
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <a
+            href={`/lessons/${lessonId}/export?format=docx`}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Download .docx
+          </a>
+          <a
+            href={`/lessons/${lessonId}/export?format=pdf`}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Download .pdf
+          </a>
+          <PendingSubmitButton
+            formAction={polishLessonPlanAction}
+            idleLabel="Polish with AI"
+            pendingLabel="Polishing…"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          />
           <PendingSubmitButton
             idleLabel="Save draft"
             pendingLabel="Saving…"
             className={buttonClass}
           />
         </div>
+        <p className="text-right text-xs text-slate-500">
+          Downloads use the last saved draft (Save or Polish first if you just
+          edited).
+        </p>
       </form>
     </div>
   );

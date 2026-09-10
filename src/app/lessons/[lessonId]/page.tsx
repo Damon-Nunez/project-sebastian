@@ -11,7 +11,7 @@ import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
 
 type LessonPageProps = {
   params: Promise<{ lessonId: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; polished?: string; error?: string }>;
 };
 
 export default async function LessonDetailPage({
@@ -19,7 +19,7 @@ export default async function LessonDetailPage({
   searchParams,
 }: LessonPageProps) {
   const { lessonId } = await params;
-  const { saved, error } = await searchParams;
+  const { saved, polished, error } = await searchParams;
   const errorMessage = lessonErrorMessage(error);
   const teacher = await getCurrentTeacher();
   const plan = await getLessonPlanForTeacher(teacher.id, lessonId);
@@ -68,6 +68,16 @@ export default async function LessonDetailPage({
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
         >
           Draft saved.
+        </p>
+      ) : null}
+
+      {polished ? (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        >
+          Draft polished with AI (Edited bodies updated — still a draft until you
+          finalize).
         </p>
       ) : null}
 

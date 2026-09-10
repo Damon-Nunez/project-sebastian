@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAnthropicEnv } from "@/lib/env";
 
-/** Default model for lesson drafts + grading suggestions (Ticket 0 lock). */
-export const DEFAULT_AI_MODEL = "claude-sonnet-4-20250514";
+/** Default model for lesson drafts + grading suggestions (Ticket 0 lock: Sonnet). */
+export const DEFAULT_AI_MODEL = "claude-sonnet-5";
 
 /**
  * Option B AI access: low-level Anthropic client factory.

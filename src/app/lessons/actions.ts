@@ -9,11 +9,13 @@ import {
 } from "@/lib/lessons/extract";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
 import type { LessonErrorCode } from "@/lib/lessons/errors";
+import { isAnthropicConfigured } from "@/lib/env";
 import {
   createLessonPlanFromFrameworkUpload,
   deleteLessonPlanForTeacher,
   updateLessonPlanContent,
 } from "@/lib/lessons/plans";
+import { polishAndSaveLessonPlan } from "@/lib/lessons/polishAndSaveLessonPlan";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
 import {
   isAllowedLessonImageMime,
@@ -120,6 +122,60 @@ export async function saveLessonPlanAction(formData: FormData) {
   revalidatePath("/lessons");
   revalidatePath(`/lessons/${lessonId}`);
   redirect(`/lessons/${lessonId}?saved=1`);
+}
+
+/**
+ * Trax 2.1 — sanitized middleman polish. Saves Edited bodies; does not mark final.
+ */
+export async function polishLessonPlanAction(formData: FormData) {
+  const teacher = await getCurrentTeacher();
+  const lessonId = formString(formData, "lessonId");
+  if (!lessonId) {
+    redirectLessonsError("missing_lesson");
+  }
+
+  if (!isAnthropicConfigured()) {
+    redirectLessonError(lessonId, "polish_unavailable");
+  }
+
+  let content;
+  try {
+    content = parseLessonPlanContent(
+      JSON.parse(formString(formData, "contentJson")),
+    );
+  } catch {
+    redirectLessonError(lessonId, "invalid_save");
+  }
+
+  const sectionGroupsRaw = formString(formData, "sectionGroupsJson");
+  let sectionGroups;
+  if (sectionGroupsRaw.length > 0) {
+    try {
+      sectionGroups = parseSectionGroups(JSON.parse(sectionGroupsRaw));
+    } catch {
+      redirectLessonError(lessonId, "invalid_save");
+    }
+  }
+
+  try {
+    await polishAndSaveLessonPlan({
+      teacherId: teacher.id,
+      lessonPlanId: lessonId,
+      content,
+      freeTextAsks: formString(formData, "freeTextAsks"),
+      moduleLabel: formString(formData, "moduleLabel"),
+      unitLabel: formString(formData, "unitLabel"),
+      lessonLabel: formString(formData, "lessonLabel"),
+      ...(sectionGroups !== undefined ? { sectionGroups } : {}),
+    });
+  } catch (error) {
+    console.error("polishLessonPlanAction failed", error);
+    redirectLessonError(lessonId, "polish_failed");
+  }
+
+  revalidatePath("/lessons");
+  revalidatePath(`/lessons/${lessonId}`);
+  redirect(`/lessons/${lessonId}?polished=1`);
 }
 
 export async function deleteLessonPlanAction(formData: FormData) {
