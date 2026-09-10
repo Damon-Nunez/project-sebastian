@@ -9,6 +9,7 @@ import {
   uploadLessonImageAction,
 } from "@/app/lessons/actions";
 import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
+import { GroupingsEditor, GroupingsPreview } from "@/components/GroupingsEditor";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import {
   bodyForViewMode,
@@ -24,6 +25,11 @@ import {
   linksForSection,
 } from "@/lib/lessons/imageSections";
 import { STANDARD_CLASSWORK_RUBRIC } from "@/lib/lessons/standardRubric";
+import {
+  emptySectionGroups,
+  type SectionGroupsMap,
+} from "@/lib/lessons/sectionGroups";
+import type { PeriodWithRoster } from "@/lib/roster/periodRosters";
 
 type LessonPlanEditorProps = {
   lessonId: string;
@@ -35,6 +41,9 @@ type LessonPlanEditorProps = {
   initialLessonLabel: string;
   /** Signed URLs keyed by image id (from server). */
   initialImageUrls?: Record<string, string>;
+  /** Account periods + rosters for optional Groupings. */
+  periods?: PeriodWithRoster[];
+  initialSectionGroups?: SectionGroupsMap;
 };
 
 type FieldStatus = "from-upload" | "edited" | "empty" | "yours" | "fixed";
@@ -375,12 +384,16 @@ export function LessonPlanEditor({
   initialUnitLabel,
   initialLessonLabel,
   initialImageUrls = {},
+  periods = [],
+  initialSectionGroups = emptySectionGroups(),
 }: LessonPlanEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [freeTextAsks, setFreeTextAsks] = useState(initialFreeTextAsks);
   const [moduleLabel, setModuleLabel] = useState(initialModuleLabel);
   const [unitLabel, setUnitLabel] = useState(initialUnitLabel);
   const [lessonLabel, setLessonLabel] = useState(initialLessonLabel);
+  /** Populated by Groupings UI (2.3); persisted via sectionGroupsJson. */
+  const [sectionGroups, setSectionGroups] = useState(initialSectionGroups);
   const [mobilePane, setMobilePane] = useState<"preview" | "edit">("preview");
   const [initialSnapshot] = useState(initialContent);
   const [workTimeCountDraft, setWorkTimeCountDraft] = useState(
@@ -914,6 +927,8 @@ export function LessonPlanEditor({
           links={previewLinks("anchorCharts")}
         />
 
+        <GroupingsPreview periods={periods} sectionGroups={sectionGroups} />
+
         {otherExtras.map(({ extra }) => (
           <PreviewSection
             key={extra.label}
@@ -1398,6 +1413,12 @@ export function LessonPlanEditor({
         </div>
       ) : null}
 
+      <GroupingsEditor
+        periods={periods}
+        sectionGroups={sectionGroups}
+        onChange={setSectionGroups}
+      />
+
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <FieldHeader
           title="Images"
@@ -1727,6 +1748,11 @@ export function LessonPlanEditor({
         <input type="hidden" name="moduleLabel" value={moduleLabel} />
         <input type="hidden" name="unitLabel" value={unitLabel} />
         <input type="hidden" name="lessonLabel" value={lessonLabel} />
+        <input
+          type="hidden"
+          name="sectionGroupsJson"
+          value={JSON.stringify(sectionGroups)}
+        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div

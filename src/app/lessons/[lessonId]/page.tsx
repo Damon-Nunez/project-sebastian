@@ -6,6 +6,8 @@ import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { lessonErrorMessage } from "@/lib/lessons/errors";
 import { signLessonPlanImages } from "@/lib/lessons/images";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
+import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
+import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
 
 type LessonPageProps = {
   params: Promise<{ lessonId: string }>;
@@ -27,7 +29,11 @@ export default async function LessonDetailPage({
   }
 
   const content = parseLessonPlanContent(plan.content);
-  const imageUrls = await signLessonPlanImages(content);
+  const sectionGroups = parseSectionGroups(plan.section_groups);
+  const [imageUrls, periods] = await Promise.all([
+    signLessonPlanImages(content),
+    listPeriodsWithRostersForTeacher(teacher.id),
+  ]);
 
   const titleBits = [
     plan.module_label ? `Module ${plan.module_label}` : null,
@@ -83,6 +89,8 @@ export default async function LessonDetailPage({
         initialUnitLabel={plan.unit_label ?? ""}
         initialLessonLabel={plan.lesson_label ?? ""}
         initialImageUrls={imageUrls}
+        periods={periods}
+        initialSectionGroups={sectionGroups}
       />
     </section>
   );

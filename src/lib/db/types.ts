@@ -71,8 +71,11 @@ export type LessonPlanRow = {
    * Validate with lessonPlanContentSchema in `@/lib/lessons/content`.
    */
   content: unknown;
-  /** Per-section groups keyed by section_id. */
-  section_groups: Record<string, unknown>;
+  /**
+   * Per-section temporary groups keyed by section_id (jsonb).
+   * Validate with parseSectionGroups in `@/lib/lessons/sectionGroups`.
+   */
+  section_groups: unknown;
   free_text_asks: string | null;
   status: DraftFinalStatus;
   drive_file_id: string | null;

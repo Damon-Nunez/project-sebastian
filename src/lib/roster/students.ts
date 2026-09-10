@@ -63,6 +63,40 @@ export async function listStudentsForPeriod(input: {
   return (primary.data ?? []) as StudentRow[];
 }
 
+/** All students for a teacher across periods (ordered by name). */
+export async function listStudentsForTeacher(
+  teacherId: string,
+): Promise<StudentRow[]> {
+  const admin = createAdminSupabaseClient();
+  const primary = await admin
+    .from("students")
+    .select(STUDENT_SELECT_WITH_NICKNAME)
+    .eq("teacher_id", teacherId)
+    .order("name", { ascending: true });
+
+  if (primary.error && isMissingNicknameColumn(primary.error.message)) {
+    const fallback = await admin
+      .from("students")
+      .select(STUDENT_SELECT_BASE)
+      .eq("teacher_id", teacherId)
+      .order("name", { ascending: true });
+
+    if (fallback.error) {
+      throw new Error(`Failed to list students: ${fallback.error.message}`);
+    }
+
+    return (fallback.data ?? []).map((row) =>
+      asStudentRow(row as Omit<StudentRow, "nickname">),
+    );
+  }
+
+  if (primary.error) {
+    throw new Error(`Failed to list students: ${primary.error.message}`);
+  }
+
+  return (primary.data ?? []) as StudentRow[];
+}
+
 export async function createStudent(input: {
   teacherId: string;
   periodId: string;

@@ -14,6 +14,7 @@ import {
   deleteLessonPlanForTeacher,
   updateLessonPlanContent,
 } from "@/lib/lessons/plans";
+import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
 import {
   isAllowedLessonImageMime,
   MAX_LESSON_IMAGE_BYTES,
@@ -90,6 +91,16 @@ export async function saveLessonPlanAction(formData: FormData) {
     redirectLessonError(lessonId, "invalid_save");
   }
 
+  const sectionGroupsRaw = formString(formData, "sectionGroupsJson");
+  let sectionGroups;
+  if (sectionGroupsRaw.length > 0) {
+    try {
+      sectionGroups = parseSectionGroups(JSON.parse(sectionGroupsRaw));
+    } catch {
+      redirectLessonError(lessonId, "invalid_save");
+    }
+  }
+
   try {
     await updateLessonPlanContent({
       teacherId: teacher.id,
@@ -99,6 +110,7 @@ export async function saveLessonPlanAction(formData: FormData) {
       moduleLabel: formString(formData, "moduleLabel"),
       unitLabel: formString(formData, "unitLabel"),
       lessonLabel: formString(formData, "lessonLabel"),
+      ...(sectionGroups !== undefined ? { sectionGroups } : {}),
     });
   } catch (error) {
     console.error("saveLessonPlanAction failed", error);

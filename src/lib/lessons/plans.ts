@@ -3,6 +3,11 @@ import { isAnthropicConfigured } from "@/lib/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { parseLessonPlanContent, type LessonPlanContent } from "./content";
 import {
+  parseSectionGroups,
+  pruneEmptySectionGroups,
+  type SectionGroupsMap,
+} from "./sectionGroups";
+import {
   detectFrameworkFormat,
   extractFrameworkText,
   UnsupportedFrameworkFormatError,
@@ -197,6 +202,8 @@ export async function updateLessonPlanContent(input: {
   moduleLabel?: string | null;
   unitLabel?: string | null;
   lessonLabel?: string | null;
+  /** When set, replaces section_groups (pruned empty periods → {}). */
+  sectionGroups?: SectionGroupsMap | null;
 }): Promise<LessonPlanRow> {
   const content = parseLessonPlanContent(input.content);
   const admin = createAdminSupabaseClient();
@@ -221,6 +228,10 @@ export async function updateLessonPlanContent(input: {
   if (input.lessonLabel !== undefined) {
     const trimmed = (input.lessonLabel ?? "").trim();
     patch.lesson_label = trimmed.length > 0 ? trimmed : null;
+  }
+  if (input.sectionGroups !== undefined) {
+    const parsed = parseSectionGroups(input.sectionGroups ?? {});
+    patch.section_groups = pruneEmptySectionGroups(parsed);
   }
 
   const { data, error } = await admin
