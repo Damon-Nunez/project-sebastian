@@ -14,6 +14,7 @@ import {
 import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
 import { GroupingsEditor, GroupingsPreview } from "@/components/GroupingsEditor";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
+import { OptionalRoutinesEditor } from "@/components/OptionalRoutinesEditor";
 import {
   bodyForViewMode,
   resizeWorkTimes,
@@ -27,6 +28,10 @@ import {
   imagesForSection,
   linksForSection,
 } from "@/lib/lessons/imageSections";
+import {
+  emptyOptionalRoutines,
+  type OptionalRoutines,
+} from "@/lib/lessons/optionalRoutines";
 import { STANDARD_CLASSWORK_RUBRIC } from "@/lib/lessons/standardRubric";
 import {
   emptySectionGroups,
@@ -47,6 +52,7 @@ type LessonPlanEditorProps = {
   /** Account periods + rosters for optional Groupings. */
   periods?: PeriodWithRoster[];
   initialSectionGroups?: SectionGroupsMap;
+  initialOptionalRoutines?: OptionalRoutines;
   /** draft = open work; final = Sebastian local FINISHED. */
   initialStatus?: "draft" | "final";
 };
@@ -248,17 +254,17 @@ function PreviewSection({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={img.url}
-                  alt={img.caption || img.filename}
+                  alt={img.caption.trim() || "Lesson plan image"}
                   className="max-h-56 w-full object-contain bg-white"
                 />
               ) : (
-                <p className="p-3 text-xs text-slate-500">{img.filename}</p>
+                <p className="p-3 text-xs text-slate-500">Image unavailable</p>
               )}
-              {(img.caption || img.filename) && (
+              {img.caption.trim() ? (
                 <figcaption className="border-t border-slate-100 px-2.5 py-1.5 text-[11px] text-slate-600">
-                  {img.caption || img.filename}
+                  {img.caption.trim()}
                 </figcaption>
-              )}
+              ) : null}
             </figure>
           ))}
         </div>
@@ -391,6 +397,7 @@ export function LessonPlanEditor({
   initialImageUrls = {},
   periods = [],
   initialSectionGroups = emptySectionGroups(),
+  initialOptionalRoutines = emptyOptionalRoutines(),
   initialStatus = "draft",
 }: LessonPlanEditorProps) {
   const isFinished = initialStatus === "final";
@@ -401,6 +408,9 @@ export function LessonPlanEditor({
   const [lessonLabel, setLessonLabel] = useState(initialLessonLabel);
   /** Populated by Groupings UI (2.3); persisted via sectionGroupsJson. */
   const [sectionGroups, setSectionGroups] = useState(initialSectionGroups);
+  const [optionalRoutines, setOptionalRoutines] = useState(
+    initialOptionalRoutines,
+  );
   const [mobilePane, setMobilePane] = useState<"preview" | "edit">("preview");
   const [initialSnapshot] = useState(initialContent);
   const [workTimeCountDraft, setWorkTimeCountDraft] = useState(
@@ -1342,6 +1352,13 @@ export function LessonPlanEditor({
         />
       </div>
 
+      <OptionalRoutinesEditor
+        content={content}
+        optionalRoutines={optionalRoutines}
+        onChangeRoutines={setOptionalRoutines}
+        onChangeContent={setContent}
+      />
+
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <FieldHeader
           title="Homework"
@@ -1759,6 +1776,11 @@ export function LessonPlanEditor({
           type="hidden"
           name="sectionGroupsJson"
           value={JSON.stringify(sectionGroups)}
+        />
+        <input
+          type="hidden"
+          name="optionalRoutinesJson"
+          value={JSON.stringify(optionalRoutines)}
         />
 
         <div className="grid gap-6 lg:grid-cols-2">

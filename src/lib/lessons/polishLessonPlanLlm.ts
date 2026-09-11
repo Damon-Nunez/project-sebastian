@@ -6,6 +6,11 @@ import {
 } from "@/lib/sanitizer/prepareAiText";
 import type { RosterStudent } from "@/lib/sanitizer/types";
 import type { LessonPlanContent } from "./content";
+import type { OptionalRoutines } from "./optionalRoutines";
+import {
+  emptyOptionalRoutines,
+  formatOptionalRoutinesContext,
+} from "./optionalRoutines";
 import type { SectionGroupsMap } from "./sectionGroups";
 import {
   applyPolishFields,
@@ -43,6 +48,7 @@ Hard rules:
 - Do NOT invent new extras entries; polish existing extras in place (same count/order).
 - Honor free-text asks when they clarify how to phrase or emphasize something.
 - Groupings context is optional background — do not dump student lists into the plan body.
+- When Turn and Talk / Think-Pair-Share optional prompts are provided, prefer keeping any already-applied routine scripts in the section bodies. If prompts are only in the optional context and not yet in the bodies, insert them into the named target sections using the requested placement (append vs weave). Do not invent extra questions beyond the teacher's prompts. Do not create new top-level sections — keep routines inside section body text.
 - Return ONLY valid JSON matching this shape (no markdown fences, no commentary):
 ${POLISH_FIELDS_JSON_SHAPE}`;
 
@@ -99,6 +105,7 @@ export async function polishLessonPlanWithLlm(input: {
   roster: RosterStudent[];
   freeTextAsks?: string | null;
   sectionGroups?: SectionGroupsMap;
+  optionalRoutines?: OptionalRoutines;
   moduleLabel?: string | null;
   unitLabel?: string | null;
   lessonLabel?: string | null;
@@ -106,6 +113,10 @@ export async function polishLessonPlanWithLlm(input: {
 }): Promise<PolishLessonPlanWithLlmResult> {
   const fields = extractPolishFields(input.content);
   const groupsContext = formatGroupsContext(input.sectionGroups ?? {});
+  const turnAndTalkContext = formatOptionalRoutinesContext(
+    input.optionalRoutines ?? emptyOptionalRoutines(),
+    input.content,
+  );
   const freeText = (input.freeTextAsks ?? "").trim();
   const model = input.model ?? LESSON_POLISH_MODEL;
 
@@ -123,6 +134,7 @@ export async function polishLessonPlanWithLlm(input: {
     groupsContext
       ? `Groupings context (do not invent student names in bodies):\n${groupsContext}`
       : null,
+    turnAndTalkContext || null,
     "Polish the following lesson plan JSON. Return the same JSON shape.",
     "",
     "---LESSON PLAN JSON---",

@@ -17,6 +17,7 @@ import {
   updateLessonPlanStatus,
 } from "@/lib/lessons/plans";
 import { polishAndSaveLessonPlan } from "@/lib/lessons/polishAndSaveLessonPlan";
+import { parseOptionalRoutines } from "@/lib/lessons/optionalRoutines";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
 import {
   isAllowedLessonImageMime,
@@ -33,6 +34,12 @@ import {
 function formString(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
+}
+
+function parseOptionalRoutinesFromForm(formData: FormData) {
+  const raw = formString(formData, "optionalRoutinesJson");
+  if (raw.length === 0) return undefined;
+  return parseOptionalRoutines(JSON.parse(raw));
 }
 
 function redirectLessonsError(code: LessonErrorCode): never {
@@ -104,6 +111,13 @@ export async function saveLessonPlanAction(formData: FormData) {
     }
   }
 
+  let optionalRoutines;
+  try {
+    optionalRoutines = parseOptionalRoutinesFromForm(formData);
+  } catch {
+    redirectLessonError(lessonId, "invalid_save");
+  }
+
   try {
     await updateLessonPlanContent({
       teacherId: teacher.id,
@@ -114,6 +128,7 @@ export async function saveLessonPlanAction(formData: FormData) {
       unitLabel: formString(formData, "unitLabel"),
       lessonLabel: formString(formData, "lessonLabel"),
       ...(sectionGroups !== undefined ? { sectionGroups } : {}),
+      ...(optionalRoutines !== undefined ? { optionalRoutines } : {}),
     });
   } catch (error) {
     console.error("saveLessonPlanAction failed", error);
@@ -158,6 +173,13 @@ export async function polishLessonPlanAction(formData: FormData) {
     }
   }
 
+  let optionalRoutines;
+  try {
+    optionalRoutines = parseOptionalRoutinesFromForm(formData);
+  } catch {
+    redirectLessonError(lessonId, "invalid_save");
+  }
+
   try {
     await polishAndSaveLessonPlan({
       teacherId: teacher.id,
@@ -168,6 +190,7 @@ export async function polishLessonPlanAction(formData: FormData) {
       unitLabel: formString(formData, "unitLabel"),
       lessonLabel: formString(formData, "lessonLabel"),
       ...(sectionGroups !== undefined ? { sectionGroups } : {}),
+      ...(optionalRoutines !== undefined ? { optionalRoutines } : {}),
     });
   } catch (error) {
     console.error("polishLessonPlanAction failed", error);
@@ -207,6 +230,13 @@ export async function finalizeLessonPlanAction(formData: FormData) {
     }
   }
 
+  let optionalRoutines;
+  try {
+    optionalRoutines = parseOptionalRoutinesFromForm(formData);
+  } catch {
+    redirectLessonError(lessonId, "invalid_save");
+  }
+
   try {
     await updateLessonPlanContent({
       teacherId: teacher.id,
@@ -217,6 +247,7 @@ export async function finalizeLessonPlanAction(formData: FormData) {
       unitLabel: formString(formData, "unitLabel"),
       lessonLabel: formString(formData, "lessonLabel"),
       ...(sectionGroups !== undefined ? { sectionGroups } : {}),
+      ...(optionalRoutines !== undefined ? { optionalRoutines } : {}),
     });
     await updateLessonPlanStatus({
       teacherId: teacher.id,

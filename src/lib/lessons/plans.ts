@@ -3,6 +3,11 @@ import { isAnthropicConfigured } from "@/lib/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { parseLessonPlanContent, type LessonPlanContent } from "./content";
 import {
+  parseOptionalRoutines,
+  pruneOptionalRoutines,
+  type OptionalRoutines,
+} from "./optionalRoutines";
+import {
   parseSectionGroups,
   pruneEmptySectionGroups,
   type SectionGroupsMap,
@@ -18,7 +23,7 @@ import { parseFrameworkText } from "./parseFramework";
 import { parseFrameworkWithLlm } from "./parseFrameworkLlm";
 
 const PLAN_SELECT =
-  "id, teacher_id, module_label, unit_label, lesson_label, content, section_groups, free_text_asks, status, drive_file_id, created_at, updated_at";
+  "id, teacher_id, module_label, unit_label, lesson_label, content, section_groups, optional_routines, free_text_asks, status, drive_file_id, created_at, updated_at";
 
 const DOCUMENT_SELECT =
   "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, created_at, updated_at";
@@ -33,8 +38,9 @@ export type FrameworkUploadResult = {
 
 function asPlanRow(data: Record<string, unknown>): LessonPlanRow {
   return {
-    ...(data as Omit<LessonPlanRow, "content">),
+    ...(data as Omit<LessonPlanRow, "content" | "optional_routines">),
     content: data.content,
+    optional_routines: data.optional_routines ?? {},
   };
 }
 
@@ -151,6 +157,7 @@ export async function createLessonPlanFromFrameworkUpload(input: {
       lesson_label: labels.lesson_label,
       content,
       section_groups: {},
+      optional_routines: {},
       free_text_asks: null,
       status: "draft",
       updated_at: now,
@@ -204,6 +211,8 @@ export async function updateLessonPlanContent(input: {
   lessonLabel?: string | null;
   /** When set, replaces section_groups (pruned empty periods → {}). */
   sectionGroups?: SectionGroupsMap | null;
+  /** When set, replaces optional_routines (pruned empty → {}). */
+  optionalRoutines?: OptionalRoutines | null;
 }): Promise<LessonPlanRow> {
   const content = parseLessonPlanContent(input.content);
   const admin = createAdminSupabaseClient();
@@ -232,6 +241,10 @@ export async function updateLessonPlanContent(input: {
   if (input.sectionGroups !== undefined) {
     const parsed = parseSectionGroups(input.sectionGroups ?? {});
     patch.section_groups = pruneEmptySectionGroups(parsed);
+  }
+  if (input.optionalRoutines !== undefined) {
+    const parsed = parseOptionalRoutines(input.optionalRoutines ?? {});
+    patch.optional_routines = pruneOptionalRoutines(parsed);
   }
 
   const { data, error } = await admin

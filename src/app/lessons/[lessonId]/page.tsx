@@ -5,6 +5,7 @@ import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { lessonErrorMessage } from "@/lib/lessons/errors";
 import { signLessonPlanImages } from "@/lib/lessons/images";
+import { parseOptionalRoutines } from "@/lib/lessons/optionalRoutines";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
 import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
@@ -37,6 +38,7 @@ export default async function LessonDetailPage({
   const isFinished = plan.status === "final";
   const content = parseLessonPlanContent(plan.content);
   const sectionGroups = parseSectionGroups(plan.section_groups);
+  const optionalRoutines = parseOptionalRoutines(plan.optional_routines);
   const [imageUrls, periods] = await Promise.all([
     signLessonPlanImages(content),
     listPeriodsWithRostersForTeacher(teacher.id),
@@ -132,6 +134,7 @@ export default async function LessonDetailPage({
         initialImageUrls={imageUrls}
         periods={periods}
         initialSectionGroups={sectionGroups}
+        initialOptionalRoutines={optionalRoutines}
         initialStatus={plan.status}
       />
     </section>

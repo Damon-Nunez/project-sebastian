@@ -76,6 +76,11 @@ export type LessonPlanRow = {
    * Validate with parseSectionGroups in `@/lib/lessons/sectionGroups`.
    */
   section_groups: unknown;
+  /**
+   * Optional discussion routines for polish (jsonb).
+   * Validate with parseOptionalRoutines in `@/lib/lessons/optionalRoutines`.
+   */
+  optional_routines: unknown;
   free_text_asks: string | null;
   status: DraftFinalStatus;
   drive_file_id: string | null;

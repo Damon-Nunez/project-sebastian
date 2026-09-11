@@ -1,16 +1,15 @@
 Focus standards code definitions and variables.
 
-Turn and Talk Optional Prompts
-
-Think Pair Share Optional Prompts
-
 LOAD TIME IS CRAZY
-
-Add fonts, colors, and remove small note under images
 
 ---
 
-## Deferred — next draft pass (after Trax SCRUM-82 pause)
+## Still parked (not SCRUM-89)
 
-Parked before Google Drive (2.4 / 2.5) and finalize UX polish (2.6).
-Items above are in scope for that drafting pass, not Drive.
+- **LOAD TIME IS CRAZY** — performance pass still open (framework upload / editor).
+
+## Shipped in SCRUM-89 (cleared from this list)
+
+- Turn and Talk Optional Prompts (multi-block + Apply)
+- Think Pair Share Optional Prompts (multi-block + Apply)
+- Export hierarchy (bold/larger headings + body spacing) + remove filename note under images

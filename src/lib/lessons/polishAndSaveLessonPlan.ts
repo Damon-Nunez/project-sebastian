@@ -1,5 +1,9 @@
-import type { LessonPlanContent } from "./content";
 import { parseLessonPlanContent } from "./content";
+import type { LessonPlanContent } from "./content";
+import {
+  parseOptionalRoutines,
+  type OptionalRoutines,
+} from "./optionalRoutines";
 import {
   getLessonPlanForTeacher,
   updateLessonPlanContent,
@@ -38,6 +42,7 @@ export async function polishAndSaveLessonPlan(input: {
   unitLabel?: string | null;
   lessonLabel?: string | null;
   sectionGroups?: SectionGroupsMap | null;
+  optionalRoutines?: OptionalRoutines | null;
 }): Promise<PolishLessonPlanResult> {
   const plan = await getLessonPlanForTeacher(
     input.teacherId,
@@ -53,6 +58,10 @@ export async function polishAndSaveLessonPlan(input: {
     input.sectionGroups !== undefined && input.sectionGroups !== null
       ? input.sectionGroups
       : parseSectionGroups(plan.section_groups);
+  const optionalRoutines =
+    input.optionalRoutines !== undefined && input.optionalRoutines !== null
+      ? input.optionalRoutines
+      : parseOptionalRoutines(plan.optional_routines);
   const freeTextAsks =
     input.freeTextAsks !== undefined
       ? input.freeTextAsks
@@ -73,6 +82,7 @@ export async function polishAndSaveLessonPlan(input: {
     roster,
     freeTextAsks,
     sectionGroups,
+    optionalRoutines,
     moduleLabel,
     unitLabel,
     lessonLabel,
@@ -87,6 +97,7 @@ export async function polishAndSaveLessonPlan(input: {
     unitLabel,
     lessonLabel,
     sectionGroups,
+    optionalRoutines,
   });
 
   return {

@@ -134,6 +134,8 @@ Shared infrastructure every teacher and every AI feature depends on.
 - **Fast, light review** (approve-and-move-on; not a heavy editor)
 - **Preserve links** in draft + editor (YouTube, resources)
 - All prompts route through sanitizer
+- **Optional discussion routines** *(SCRUM-89)*: multi-block Turn and Talk + Think-Pair-Share (target section, append/weave, prompts) with local **Apply to plan** (polish optional)
+- **Export polish** *(SCRUM-89)*: PDF/DOCX hierarchy (larger bold headings, readable body, preserved blank lines, bold routine labels); captions only when teacher-set (no filename under images)
 
 **Phase 1A exit criteria**: Teacher can set up classes, upload a framework doc, generate + iterate a plan, save to Drive — for a lesson format they didn't hard-code into the repo.
 

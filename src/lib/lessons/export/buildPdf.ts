@@ -7,6 +7,12 @@ import {
   type PDFImage,
   type PDFPage,
 } from "pdf-lib";
+import {
+  EXPORT_COLORS,
+  EXPORT_THEME,
+  isRoutineHeadingLine,
+  splitBodyLines,
+} from "./exportTheme";
 import type { HydratedLessonPlanExportDocument } from "./hydrateAssets";
 import { fitImageSize, sniffImageKind } from "./imageSizing";
 
@@ -14,6 +20,22 @@ const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const MARGIN = 54;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+
+const textColor = rgb(
+  EXPORT_COLORS.text.r,
+  EXPORT_COLORS.text.g,
+  EXPORT_COLORS.text.b,
+);
+const headingColor = rgb(
+  EXPORT_COLORS.heading.r,
+  EXPORT_COLORS.heading.g,
+  EXPORT_COLORS.heading.b,
+);
+const linkColor = rgb(
+  EXPORT_COLORS.link.r,
+  EXPORT_COLORS.link.g,
+  EXPORT_COLORS.link.b,
+);
 
 function wrapLine(
   text: string,
@@ -113,11 +135,16 @@ export async function buildLessonPlanPdf(
     size: number,
     useBold: boolean,
     gapAfter: number,
-    color = rgb(0.1, 0.1, 0.12),
+    color = textColor,
   ) => {
     const active: PDFFont = useBold ? fontBold : font;
     const lineHeight = size + 4;
-    for (const source of text.split(/\r?\n/)) {
+    for (const source of splitBodyLines(text)) {
+      if (source.length === 0) {
+        ensureSpace(lineHeight + EXPORT_THEME.blankLineExtra);
+        y -= lineHeight + EXPORT_THEME.blankLineExtra;
+        continue;
+      }
       for (const line of wrapLine(source, active, size)) {
         ensureSpace(lineHeight);
         page.drawText(line.length > 0 ? line : " ", {
@@ -126,6 +153,33 @@ export async function buildLessonPlanPdf(
           size,
           font: active,
           color,
+          maxWidth: CONTENT_WIDTH,
+        });
+        y -= lineHeight;
+      }
+    }
+    y -= gapAfter;
+  };
+
+  const drawBody = (body: string, gapAfter: number) => {
+    const size = EXPORT_THEME.bodySize;
+    const lineHeight = size + 4;
+    for (const source of splitBodyLines(body)) {
+      if (source.length === 0) {
+        ensureSpace(lineHeight + EXPORT_THEME.blankLineExtra);
+        y -= lineHeight + EXPORT_THEME.blankLineExtra;
+        continue;
+      }
+      const useBold = isRoutineHeadingLine(source);
+      const active: PDFFont = useBold ? fontBold : font;
+      for (const line of wrapLine(source, active, size)) {
+        ensureSpace(lineHeight);
+        page.drawText(line.length > 0 ? line : " ", {
+          x: MARGIN,
+          y: y - size,
+          size,
+          font: active,
+          color: textColor,
           maxWidth: CONTENT_WIDTH,
         });
         y -= lineHeight;
@@ -154,28 +208,47 @@ export async function buildLessonPlanPdf(
     return { page, x: MARGIN, y: drawY, w: size.width, h: size.height };
   };
 
-  drawWrapped(doc.title, 18, true, 8);
+  drawWrapped(
+    doc.title,
+    EXPORT_THEME.titleSize,
+    true,
+    EXPORT_THEME.afterTitleGap,
+    headingColor,
+  );
   if (doc.subtitle) {
-    drawWrapped(doc.subtitle, 11, false, 14);
+    drawWrapped(
+      doc.subtitle,
+      EXPORT_THEME.subtitleSize,
+      false,
+      EXPORT_THEME.afterSubtitleGap,
+    );
   }
 
   for (const section of doc.sections) {
-    drawWrapped(section.heading, 13, true, 6);
-    if (section.body.trim()) {
-      drawWrapped(section.body, 11, false, 8);
+    drawWrapped(
+      section.heading,
+      EXPORT_THEME.sectionHeadingSize,
+      true,
+      EXPORT_THEME.afterSectionHeadingGap,
+      headingColor,
+    );
+    if (section.body.length > 0) {
+      drawBody(section.body, EXPORT_THEME.afterBodyGap);
     }
 
     for (const image of section.images) {
-      const label = image.caption || image.originalFilename || "Image";
+      const caption = image.caption.trim();
       if (image.bytes) {
         const placed = await drawImage(image.bytes, 480, 360);
         if (!placed) {
-          drawWrapped(`Image (could not embed): ${label}`, 10, false, 6);
+          drawWrapped("Image (could not embed)", 10, false, 6);
+        } else if (caption) {
+          drawWrapped(caption, EXPORT_THEME.captionSize, false, 10);
         } else {
-          drawWrapped(label, 9, false, 10);
+          y -= 10;
         }
       } else {
-        drawWrapped(`Image (missing file): ${label}`, 10, false, 6);
+        drawWrapped("Image (missing file)", 10, false, 6);
       }
     }
 
@@ -198,7 +271,7 @@ export async function buildLessonPlanPdf(
       }
 
       const linkLabel = `${title} — ${link.url}`;
-      const size = 10;
+      const size = EXPORT_THEME.linkSize;
       const lines = wrapLine(linkLabel, font, size);
       for (const line of lines) {
         ensureSpace(size + 4);
@@ -212,7 +285,7 @@ export async function buildLessonPlanPdf(
           y: textY,
           size,
           font,
-          color: rgb(0.05, 0.35, 0.75),
+          color: linkColor,
         });
         addUriLink(pdf, page, link.url, MARGIN, textY - 2, textWidth, size + 4);
         y -= size + 4;

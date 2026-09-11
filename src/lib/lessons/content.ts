@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Ticket 5 / Approach A: fixed formula fields + flexible Work Time array.
  * Lives in lesson_plans.content (jsonb). Row columns keep M/U/L labels,
- * free_text_asks, and section_groups.
+ * free_text_asks, section_groups, and optional_routines.
  *
  * Opening / Closing / Work Time bodies keep three variants:
  * - body = Edited (teacher working copy; what generation uses)

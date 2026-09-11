@@ -7,6 +7,12 @@ import {
   Paragraph,
   TextRun,
 } from "docx";
+import {
+  EXPORT_COLORS,
+  EXPORT_THEME_DOCX,
+  isRoutineHeadingLine,
+  splitBodyLines,
+} from "./exportTheme";
 import type { HydratedLessonPlanExportDocument } from "./hydrateAssets";
 import {
   fitImageSize,
@@ -15,19 +21,28 @@ import {
 } from "./imageSizing";
 
 function paragraphsFromBody(body: string): Paragraph[] {
-  if (!body.trim()) return [];
-  return body.split(/\r?\n/).map(
-    (line) =>
-      new Paragraph({
-        spacing: { after: 120 },
-        children: [
-          new TextRun({
-            text: line.length > 0 ? line : " ",
-            size: 22,
-          }),
-        ],
-      }),
-  );
+  if (!body) return [];
+  return splitBodyLines(body).map((line) => {
+    const isBlank = line.length === 0;
+    const isHeading = !isBlank && isRoutineHeadingLine(line);
+    return new Paragraph({
+      spacing: {
+        after: isBlank
+          ? EXPORT_THEME_DOCX.afterBlankLine
+          : isHeading
+            ? EXPORT_THEME_DOCX.afterRoutineHeading
+            : EXPORT_THEME_DOCX.afterBodyLine,
+      },
+      children: [
+        new TextRun({
+          text: isBlank ? " " : line,
+          bold: isHeading,
+          size: EXPORT_THEME_DOCX.bodySize,
+          color: EXPORT_COLORS.textHex,
+        }),
+      ],
+    });
+  });
 }
 
 function imageParagraph(
@@ -61,7 +76,8 @@ function attachmentParagraphs(
   const out: Paragraph[] = [];
 
   for (const image of section.images) {
-    const label = image.caption || image.originalFilename || "Image";
+    const caption = image.caption.trim();
+    const alt = caption || "Image";
     const kindFromEmbed =
       image.embedMimeType === "image/png"
         ? ("png" as const)
@@ -74,24 +90,32 @@ function attachmentParagraphs(
       mimeToDocxImageType(image.mimeType);
 
     if (image.bytes && kind && (kind === "jpg" || kind === "png" || kind === "gif" || kind === "bmp")) {
-      out.push(imageParagraph(image.bytes, kind, label, 480, 360));
-      out.push(
-        new Paragraph({
-          spacing: { after: 160 },
-          children: [
-            new TextRun({ text: label, italics: true, size: 18 }),
-          ],
-        }),
-      );
+      out.push(imageParagraph(image.bytes, kind, alt, 480, 360));
+      if (caption) {
+        out.push(
+          new Paragraph({
+            spacing: { after: 160 },
+            children: [
+              new TextRun({
+                text: caption,
+                italics: true,
+                size: EXPORT_THEME_DOCX.captionSize,
+                color: EXPORT_COLORS.textHex,
+              }),
+            ],
+          }),
+        );
+      }
     } else {
       out.push(
         new Paragraph({
           spacing: { after: 120 },
           children: [
             new TextRun({
-              text: `Image (could not embed): ${label}`,
+              text: "Image (could not embed)",
               italics: true,
               size: 20,
+              color: EXPORT_COLORS.textHex,
             }),
           ],
         }),
@@ -106,7 +130,6 @@ function attachmentParagraphs(
       : null;
 
     if (link.thumbnailBytes && thumbKind) {
-      // Clickable thumbnail → opens the video/resource URL.
       out.push(
         new Paragraph({
           spacing: { before: 120, after: 80 },
@@ -141,9 +164,9 @@ function attachmentParagraphs(
               new TextRun({
                 text: `${title} — ${link.url}`,
                 style: "Hyperlink",
-                color: "0563C1",
+                color: EXPORT_COLORS.linkHex,
                 underline: {},
-                size: 20,
+                size: EXPORT_THEME_DOCX.linkSize,
               }),
             ],
           }),
@@ -162,12 +185,13 @@ export async function buildLessonPlanDocx(
   const children: Paragraph[] = [
     new Paragraph({
       heading: HeadingLevel.TITLE,
-      spacing: { after: 200 },
+      spacing: { after: EXPORT_THEME_DOCX.afterTitle },
       children: [
         new TextRun({
           text: doc.title,
           bold: true,
-          size: 32,
+          size: EXPORT_THEME_DOCX.titleSize,
+          color: EXPORT_COLORS.headingHex,
         }),
       ],
     }),
@@ -176,12 +200,13 @@ export async function buildLessonPlanDocx(
   if (doc.subtitle) {
     children.push(
       new Paragraph({
-        spacing: { after: 300 },
+        spacing: { after: EXPORT_THEME_DOCX.afterSubtitle },
         children: [
           new TextRun({
             text: doc.subtitle,
             italics: true,
-            size: 20,
+            size: EXPORT_THEME_DOCX.subtitleSize,
+            color: EXPORT_COLORS.textHex,
           }),
         ],
       }),
@@ -192,12 +217,16 @@ export async function buildLessonPlanDocx(
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_1,
-        spacing: { before: 280, after: 120 },
+        spacing: {
+          before: EXPORT_THEME_DOCX.beforeSection,
+          after: EXPORT_THEME_DOCX.afterSection,
+        },
         children: [
           new TextRun({
             text: section.heading,
             bold: true,
-            size: 26,
+            size: EXPORT_THEME_DOCX.sectionHeadingSize,
+            color: EXPORT_COLORS.headingHex,
           }),
         ],
       }),
