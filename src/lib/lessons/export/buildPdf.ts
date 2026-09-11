@@ -37,6 +37,25 @@ const linkColor = rgb(
   EXPORT_COLORS.link.b,
 );
 
+/** Rubric level header like "2 — Approaching Standard". */
+function looksLikeRubricLevel(line: string): boolean {
+  return /^\d+\s+[—–-]\s+\S/.test(line.trim());
+}
+
+/**
+ * Helvetica (WinAnsi) can't encode every Unicode glyph. Map common punctuation
+ * so drawText doesn't throw mid-document and truncate the export.
+ */
+function toWinAnsiSafe(text: string): string {
+  return text
+    .replace(/[\u2018\u2019\u201A\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ")
+    .replace(/[^\t\n\r\x20-\x7E\xA0-\xFF]/g, "?");
+}
+
 function wrapLine(
   text: string,
   font: { widthOfTextAtSize: (t: string, s: number) => number },
@@ -130,6 +149,14 @@ export async function buildLessonPlanPdf(
     y = PAGE_HEIGHT - MARGIN;
   };
 
+  /**
+   * Avoid orphaning a heading / rubric level at the bottom of a page with no
+   * room for the lines that belong with it (looks like a "cut off" export).
+   */
+  const ensureParagraphStart = (lineHeight: number, minLines = 4) => {
+    ensureSpace(lineHeight * minLines);
+  };
+
   const drawWrapped = (
     text: string,
     size: number,
@@ -145,9 +172,10 @@ export async function buildLessonPlanPdf(
         y -= lineHeight + EXPORT_THEME.blankLineExtra;
         continue;
       }
+      ensureParagraphStart(lineHeight);
       for (const line of wrapLine(source, active, size)) {
         ensureSpace(lineHeight);
-        page.drawText(line.length > 0 ? line : " ", {
+        page.drawText(toWinAnsiSafe(line.length > 0 ? line : " "), {
           x: MARGIN,
           y: y - size,
           size,
@@ -172,9 +200,11 @@ export async function buildLessonPlanPdf(
       }
       const useBold = isRoutineHeadingLine(source);
       const active: PDFFont = useBold ? fontBold : font;
+      // Rubric level headers / routine labels should stay with following lines.
+      ensureParagraphStart(lineHeight, useBold || looksLikeRubricLevel(source) ? 5 : 4);
       for (const line of wrapLine(source, active, size)) {
         ensureSpace(lineHeight);
-        page.drawText(line.length > 0 ? line : " ", {
+        page.drawText(toWinAnsiSafe(line.length > 0 ? line : " "), {
           x: MARGIN,
           y: y - size,
           size,
@@ -239,7 +269,10 @@ export async function buildLessonPlanPdf(
     for (const image of section.images) {
       const caption = image.caption.trim();
       if (image.bytes) {
-        const placed = await drawImage(image.bytes, 480, 360);
+        // Fixed chrome (rubric) is wide — use full content width.
+        const maxW = image.publicPath ? CONTENT_WIDTH : 480;
+        const maxH = image.publicPath ? 320 : 360;
+        const placed = await drawImage(image.bytes, maxW, maxH);
         if (!placed) {
           drawWrapped("Image (could not embed)", 10, false, 6);
         } else if (caption) {
@@ -270,7 +303,7 @@ export async function buildLessonPlanPdf(
         }
       }
 
-      const linkLabel = `${title} — ${link.url}`;
+      const linkLabel = toWinAnsiSafe(`${title} — ${link.url}`);
       const size = EXPORT_THEME.linkSize;
       const lines = wrapLine(linkLabel, font, size);
       for (const line of lines) {

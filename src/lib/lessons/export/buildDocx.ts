@@ -17,6 +17,7 @@ import type { HydratedLessonPlanExportDocument } from "./hydrateAssets";
 import {
   fitImageSize,
   mimeToDocxImageType,
+  readPngSize,
   sniffImageKind,
 } from "./imageSizing";
 
@@ -52,7 +53,13 @@ function imageParagraph(
   maxWidth: number,
   maxHeight: number,
 ): Paragraph {
-  const size = fitImageSize(null, null, maxWidth, maxHeight);
+  const png = kind === "png" ? readPngSize(bytes) : null;
+  const size = fitImageSize(
+    png?.width ?? null,
+    png?.height ?? null,
+    maxWidth,
+    maxHeight,
+  );
   return new Paragraph({
     spacing: { before: 120, after: 120 },
     children: [
@@ -90,7 +97,10 @@ function attachmentParagraphs(
       mimeToDocxImageType(image.mimeType);
 
     if (image.bytes && kind && (kind === "jpg" || kind === "png" || kind === "gif" || kind === "bmp")) {
-      out.push(imageParagraph(image.bytes, kind, alt, 480, 360));
+      // Full content width (~6.5"); height follows aspect (do not cap short).
+      const maxW = image.publicPath ? 624 : 480;
+      const maxH = image.publicPath ? 400 : 360;
+      out.push(imageParagraph(image.bytes, kind, alt, maxW, maxH));
       if (caption) {
         out.push(
           new Paragraph({

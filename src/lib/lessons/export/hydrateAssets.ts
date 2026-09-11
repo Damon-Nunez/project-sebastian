@@ -1,4 +1,6 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { LESSON_PLAN_IMAGES_BUCKET } from "../images";
 import type {
   ExportImageRef,
@@ -29,6 +31,18 @@ export type HydratedLessonPlanExportDocument = Omit<
 > & {
   sections: HydratedExportSection[];
 };
+
+async function readPublicAssetBytes(
+  publicPath: string,
+): Promise<Uint8Array | null> {
+  try {
+    const full = path.join(process.cwd(), "public", publicPath);
+    return new Uint8Array(await fs.readFile(full));
+  } catch (error) {
+    console.error("export public asset read failed", publicPath, error);
+    return null;
+  }
+}
 
 async function downloadStorageBytes(
   storagePath: string,
@@ -73,9 +87,20 @@ async function loadEmbeddableImage(
   return { bytes: normalized.bytes, embedMimeType: normalized.mimeType };
 }
 
+async function loadExportImageBytes(
+  image: ExportImageRef,
+): Promise<Uint8Array | null> {
+  if (image.publicPath?.trim()) {
+    return readPublicAssetBytes(image.publicPath.trim());
+  }
+  if (!image.storagePath.trim()) return null;
+  return downloadStorageBytes(image.storagePath);
+}
+
 /**
  * Load binary assets for export: lesson images from Storage + link thumbnails
  * (YouTube hqdefault, etc.) over HTTPS. WebP/GIF are converted to PNG.
+ * Fixed chrome (e.g. classwork rubric) loads from /public.
  */
 export async function hydrateExportDocument(
   doc: LessonPlanExportDocument,
@@ -85,7 +110,7 @@ export async function hydrateExportDocument(
   for (const section of doc.sections) {
     const images: HydratedExportImage[] = await Promise.all(
       section.images.map(async (image) => {
-        const raw = await downloadStorageBytes(image.storagePath);
+        const raw = await loadExportImageBytes(image);
         const embeddable = await loadEmbeddableImage(raw, image.mimeType);
         return {
           ...image,

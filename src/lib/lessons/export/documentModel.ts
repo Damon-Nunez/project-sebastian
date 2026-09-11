@@ -3,7 +3,10 @@ import type {
   LessonPlanImage,
   LessonPlanLink,
 } from "../content";
-import { STANDARD_CLASSWORK_RUBRIC } from "../standardRubric";
+import {
+  STANDARD_CLASSWORK_RUBRIC,
+  STANDARD_CLASSWORK_RUBRIC_IMAGE,
+} from "../standardRubric";
 
 export type ExportLink = {
   title: string;
@@ -17,7 +20,10 @@ export type ExportImageRef = {
   caption: string;
   originalFilename: string;
   mimeType: string;
+  /** Supabase storage path; empty when `publicPath` is set. */
   storagePath: string;
+  /** Path relative to /public for fixed lesson chrome (rubric, etc.). */
+  publicPath?: string;
 };
 
 export type ExportSection = {
@@ -139,13 +145,37 @@ export function formatLessonPlanExportFilename(
   return `${safe}.${extension}`;
 }
 
-function formatRubricBody(): string {
-  return STANDARD_CLASSWORK_RUBRIC.levels
-    .map((level) => {
-      const criteria = level.criteria.map((line) => `  - ${line}`).join("\n");
-      return `${level.score} — ${level.label}\n${criteria}`;
-    })
-    .join("\n\n");
+function isLearningTargetsExtra(label: string): boolean {
+  return label.trim().toLowerCase() === "learning targets";
+}
+
+/** Learning Targets live in extras until they become a first-class field. */
+function learningTargetsBody(content: LessonPlanContent): string {
+  const block = content.extras.find((extra) =>
+    isLearningTargetsExtra(extra.label),
+  );
+  return trimOrEmpty(block?.body ?? "");
+}
+
+function formatStandardsAndTargetsBody(
+  standards: string,
+  targets: string,
+): string {
+  const codes = trimOrEmpty(standards);
+  const learningTargets = trimOrEmpty(targets);
+  if (codes && learningTargets) return `${codes}\n\n${learningTargets}`;
+  return codes || learningTargets;
+}
+
+function standardRubricImageRef(): ExportImageRef {
+  return {
+    id: STANDARD_CLASSWORK_RUBRIC_IMAGE.id,
+    caption: "",
+    originalFilename: STANDARD_CLASSWORK_RUBRIC_IMAGE.filename,
+    mimeType: STANDARD_CLASSWORK_RUBRIC_IMAGE.mimeType,
+    storagePath: "",
+    publicPath: STANDARD_CLASSWORK_RUBRIC_IMAGE.publicPath,
+  };
 }
 
 /**
@@ -166,7 +196,10 @@ export function buildLessonPlanExportDocument(
   pushSection(
     sections,
     "Standards / Learning targets",
-    content.standards,
+    formatStandardsAndTargetsBody(
+      content.standards,
+      learningTargetsBody(content),
+    ),
     attachmentsForSection(content, "learningTargets"),
   );
   pushSection(
@@ -187,7 +220,10 @@ export function buildLessonPlanExportDocument(
     content.entranceTicket,
     attachmentsForSection(content, "entranceTicket"),
   );
-  pushSection(sections, STANDARD_CLASSWORK_RUBRIC.title, formatRubricBody());
+  pushSection(sections, STANDARD_CLASSWORK_RUBRIC.title, "", {
+    links: [],
+    images: [standardRubricImageRef()],
+  });
   pushSection(
     sections,
     "Materials",
@@ -218,6 +254,8 @@ export function buildLessonPlanExportDocument(
   );
 
   for (const [index, block] of content.extras.entries()) {
+    // Already merged into "Standards / Learning targets" above.
+    if (isLearningTargetsExtra(block.label)) continue;
     pushSection(
       sections,
       `${block.label || `Extra ${index + 1}`}${minutesSuffix(block.minutes)}`,

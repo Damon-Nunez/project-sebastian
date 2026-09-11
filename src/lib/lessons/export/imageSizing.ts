@@ -36,6 +36,34 @@ export function sniffImageKind(bytes: Uint8Array): ImageKind | null {
   return null;
 }
 
+/** Read width/height from PNG IHDR when present. */
+export function readPngSize(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  if (
+    bytes.length < 24 ||
+    bytes[0] !== 0x89 ||
+    bytes[1] !== 0x50 ||
+    bytes[2] !== 0x4e ||
+    bytes[3] !== 0x47
+  ) {
+    return null;
+  }
+  // IHDR chunk starts at byte 8; width/height are big-endian at 16 and 20.
+  const width =
+    ((bytes[16] ?? 0) << 24) |
+    ((bytes[17] ?? 0) << 16) |
+    ((bytes[18] ?? 0) << 8) |
+    (bytes[19] ?? 0);
+  const height =
+    ((bytes[20] ?? 0) << 24) |
+    ((bytes[21] ?? 0) << 16) |
+    ((bytes[22] ?? 0) << 8) |
+    (bytes[23] ?? 0);
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
 /** Fit inside max box; default 16:9 when natural size unknown. */
 export function fitImageSize(
   naturalWidth: number | null,

@@ -1,6 +1,7 @@
 /**
  * District-standard classwork/homework rubric.
  * Mandated formula chrome — shown above Materials, not teacher-edited.
+ * Export + editor use the fixed PNG (same pattern as Differentiation images).
  */
 export const STANDARD_CLASSWORK_RUBRIC = {
   title: "General Classwork and/or Homework Rubric",
@@ -47,3 +48,15 @@ export const STANDARD_CLASSWORK_RUBRIC = {
     },
   ],
 } as const;
+
+/** Bundled rubric graphic under /public — UI preview + PDF/DOCX embed. */
+export const STANDARD_CLASSWORK_RUBRIC_IMAGE = {
+  id: "standard-classwork-rubric",
+  /** Browser URL (cache-bust when regenerating the PNG). */
+  src: "/lessons/rubric/classwork-homework-rubric.png?v=3",
+  /** Path relative to /public for server-side export reads. */
+  publicPath: "lessons/rubric/classwork-homework-rubric.png",
+  alt: "General Classwork and/or Homework Rubric",
+  filename: "classwork-homework-rubric.png",
+  mimeType: "image/png" as const,
+};

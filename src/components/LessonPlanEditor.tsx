@@ -32,7 +32,10 @@ import {
   emptyOptionalRoutines,
   type OptionalRoutines,
 } from "@/lib/lessons/optionalRoutines";
-import { STANDARD_CLASSWORK_RUBRIC } from "@/lib/lessons/standardRubric";
+import {
+  STANDARD_CLASSWORK_RUBRIC,
+  STANDARD_CLASSWORK_RUBRIC_IMAGE,
+} from "@/lib/lessons/standardRubric";
 import {
   emptySectionGroups,
   type SectionGroupsMap,
@@ -348,27 +351,13 @@ function StandardRubricPreview() {
       <p className="mt-1 text-xs text-slate-500">
         District standard rubric — always included, not edited per lesson.
       </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {STANDARD_CLASSWORK_RUBRIC.levels.map((level) => (
-          <div
-            key={level.score}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-          >
-            <p className={`text-xs font-semibold ${level.headerClass}`}>
-              {level.score} {level.label}
-            </p>
-            <ul className="mt-2 space-y-1.5 text-[11px] leading-4 text-slate-600">
-              {level.criteria.map((line) => (
-                <li key={line} className="flex gap-1.5">
-                  <span aria-hidden className="mt-0.5 text-slate-400">
-                    ☐
-                  </span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+      <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={STANDARD_CLASSWORK_RUBRIC_IMAGE.src}
+          alt={STANDARD_CLASSWORK_RUBRIC_IMAGE.alt}
+          className="block w-full bg-white"
+        />
       </div>
     </section>
   );
@@ -1125,8 +1114,16 @@ export function LessonPlanEditor({
           hint="Mandated formula block — same every lesson"
         />
         <p className="text-sm text-slate-600">
-          Shown above Materials in the preview. Not editable here.
+          Shown above Materials in the preview and export. Not editable here.
         </p>
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={STANDARD_CLASSWORK_RUBRIC_IMAGE.src}
+            alt={STANDARD_CLASSWORK_RUBRIC_IMAGE.alt}
+            className="block w-full bg-white"
+          />
+        </div>
       </div>
 
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
