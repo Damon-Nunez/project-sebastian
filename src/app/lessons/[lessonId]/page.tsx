@@ -11,7 +11,13 @@ import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
 
 type LessonPageProps = {
   params: Promise<{ lessonId: string }>;
-  searchParams: Promise<{ saved?: string; polished?: string; error?: string }>;
+  searchParams: Promise<{
+    saved?: string;
+    polished?: string;
+    finished?: string;
+    reopened?: string;
+    error?: string;
+  }>;
 };
 
 export default async function LessonDetailPage({
@@ -19,7 +25,7 @@ export default async function LessonDetailPage({
   searchParams,
 }: LessonPageProps) {
   const { lessonId } = await params;
-  const { saved, polished, error } = await searchParams;
+  const { saved, polished, finished, reopened, error } = await searchParams;
   const errorMessage = lessonErrorMessage(error);
   const teacher = await getCurrentTeacher();
   const plan = await getLessonPlanForTeacher(teacher.id, lessonId);
@@ -28,6 +34,7 @@ export default async function LessonDetailPage({
     notFound();
   }
 
+  const isFinished = plan.status === "final";
   const content = parseLessonPlanContent(plan.content);
   const sectionGroups = parseSectionGroups(plan.section_groups);
   const [imageUrls, periods] = await Promise.all([
@@ -51,14 +58,19 @@ export default async function LessonDetailPage({
             Lessons
           </Link>
           <span className="mx-2 text-slate-300">/</span>
-          Draft
+          {isFinished ? "Finished" : "Draft"}
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-          {draftTitle === "Untitled draft" ? "Lesson draft" : draftTitle}
+          {draftTitle === "Untitled draft"
+            ? isFinished
+              ? "Finished lesson"
+              : "Lesson draft"
+            : draftTitle}
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
           Left: reference preview (swap Simplified / Original). Right: edit the
-          draft, add images under a section, then save.
+          plan, add images under a section, then save
+          {isFinished ? " or move back to drafts." : " or mark finished."}
         </p>
       </div>
 
@@ -67,7 +79,7 @@ export default async function LessonDetailPage({
           role="status"
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
         >
-          Draft saved.
+          {isFinished ? "Finished plan saved." : "Draft saved."}
         </p>
       ) : null}
 
@@ -77,7 +89,26 @@ export default async function LessonDetailPage({
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
         >
           Draft polished with AI (Edited bodies updated — still a draft until you
-          finalize).
+          mark finished).
+        </p>
+      ) : null}
+
+      {finished ? (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        >
+          Marked finished — now under Finished on the Lessons page (Sebastian
+          local save).
+        </p>
+      ) : null}
+
+      {reopened ? (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        >
+          Moved back to Drafts.
         </p>
       ) : null}
 
@@ -101,6 +132,7 @@ export default async function LessonDetailPage({
         initialImageUrls={imageUrls}
         periods={periods}
         initialSectionGroups={sectionGroups}
+        initialStatus={plan.status}
       />
     </section>
   );

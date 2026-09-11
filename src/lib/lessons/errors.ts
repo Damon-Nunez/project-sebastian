@@ -27,6 +27,8 @@ export const LESSON_ERROR_MESSAGES = {
   link_remove_failed: "Could not remove that link. Please try again.",
   polish_failed: "AI polish failed. Check your draft and try again.",
   polish_unavailable: "AI polish needs ANTHROPIC_API_KEY configured.",
+  finalize_failed: "Could not mark this plan as finished. Please try again.",
+  reopen_failed: "Could not move this plan back to drafts. Please try again.",
 } as const;
 
 export type LessonErrorCode = keyof typeof LESSON_ERROR_MESSAGES;

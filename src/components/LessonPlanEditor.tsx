@@ -3,9 +3,11 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import {
   addLessonPlanLinkAction,
+  finalizeLessonPlanAction,
   polishLessonPlanAction,
   removeLessonImageAction,
   removeLessonPlanLinkAction,
+  reopenLessonPlanAction,
   saveLessonPlanAction,
   uploadLessonImageAction,
 } from "@/app/lessons/actions";
@@ -45,6 +47,8 @@ type LessonPlanEditorProps = {
   /** Account periods + rosters for optional Groupings. */
   periods?: PeriodWithRoster[];
   initialSectionGroups?: SectionGroupsMap;
+  /** draft = open work; final = Sebastian local FINISHED. */
+  initialStatus?: "draft" | "final";
 };
 
 type FieldStatus = "from-upload" | "edited" | "empty" | "yours" | "fixed";
@@ -387,7 +391,9 @@ export function LessonPlanEditor({
   initialImageUrls = {},
   periods = [],
   initialSectionGroups = emptySectionGroups(),
+  initialStatus = "draft",
 }: LessonPlanEditorProps) {
+  const isFinished = initialStatus === "final";
   const [content, setContent] = useState(initialContent);
   const [freeTextAsks, setFreeTextAsks] = useState(initialFreeTextAsks);
   const [moduleLabel, setModuleLabel] = useState(initialModuleLabel);
@@ -1781,21 +1787,46 @@ export function LessonPlanEditor({
           >
             Download .pdf
           </a>
-          <PendingSubmitButton
-            formAction={polishLessonPlanAction}
-            idleLabel="Polish with AI"
-            pendingLabel="Polishing…"
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-          />
-          <PendingSubmitButton
-            idleLabel="Save draft"
-            pendingLabel="Saving…"
-            className={buttonClass}
-          />
+          {!isFinished ? (
+            <>
+              <PendingSubmitButton
+                formAction={polishLessonPlanAction}
+                idleLabel="Polish with AI"
+                pendingLabel="Polishing…"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              />
+              <PendingSubmitButton
+                idleLabel="Save draft"
+                pendingLabel="Saving…"
+                className={buttonClass}
+              />
+              <PendingSubmitButton
+                formAction={finalizeLessonPlanAction}
+                idleLabel="Mark finished"
+                pendingLabel="Finishing…"
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-70"
+              />
+            </>
+          ) : (
+            <>
+              <PendingSubmitButton
+                idleLabel="Save changes"
+                pendingLabel="Saving…"
+                className={buttonClass}
+              />
+              <PendingSubmitButton
+                formAction={reopenLessonPlanAction}
+                idleLabel="Move back to drafts"
+                pendingLabel="Moving…"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              />
+            </>
+          )}
         </div>
         <p className="text-right text-xs text-slate-500">
-          Downloads use the last saved draft (Save or Polish first if you just
-          edited).
+          {isFinished
+            ? "This plan is in Finished (Sebastian local save). Move back to drafts to polish again."
+            : "Downloads use the last saved draft (Save, Polish, or Mark finished first if you just edited)."}
         </p>
       </form>
     </div>

@@ -252,6 +252,33 @@ export async function updateLessonPlanContent(input: {
   return asPlanRow(data as Record<string, unknown>);
 }
 
+/** Flip draft ↔ final (Sebastian Local Save / FINISHED list). */
+export async function updateLessonPlanStatus(input: {
+  teacherId: string;
+  lessonPlanId: string;
+  status: "draft" | "final";
+}): Promise<LessonPlanRow> {
+  const admin = createAdminSupabaseClient();
+  const now = new Date().toISOString();
+
+  const { data, error } = await admin
+    .from("lesson_plans")
+    .update({ status: input.status, updated_at: now })
+    .eq("teacher_id", input.teacherId)
+    .eq("id", input.lessonPlanId)
+    .select(PLAN_SELECT)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to update lesson plan status: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error("Lesson plan not found");
+  }
+
+  return asPlanRow(data as Record<string, unknown>);
+}
+
 /**
  * Delete a lesson plan owned by the teacher, plus linked document rows.
  * Documents FK is ON DELETE SET NULL — we remove them explicitly.

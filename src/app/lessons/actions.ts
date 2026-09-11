@@ -14,6 +14,7 @@ import {
   createLessonPlanFromFrameworkUpload,
   deleteLessonPlanForTeacher,
   updateLessonPlanContent,
+  updateLessonPlanStatus,
 } from "@/lib/lessons/plans";
 import { polishAndSaveLessonPlan } from "@/lib/lessons/polishAndSaveLessonPlan";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
@@ -176,6 +177,84 @@ export async function polishLessonPlanAction(formData: FormData) {
   revalidatePath("/lessons");
   revalidatePath(`/lessons/${lessonId}`);
   redirect(`/lessons/${lessonId}?polished=1`);
+}
+
+/** Trax 2.3 — move plan into Sebastian Local Save (FINISHED). */
+export async function finalizeLessonPlanAction(formData: FormData) {
+  const teacher = await getCurrentTeacher();
+  const lessonId = formString(formData, "lessonId");
+  if (!lessonId) {
+    redirectLessonsError("missing_lesson");
+  }
+
+  // Persist latest editor fields first so FINISHED matches what she sees.
+  let content;
+  try {
+    content = parseLessonPlanContent(
+      JSON.parse(formString(formData, "contentJson")),
+    );
+  } catch {
+    redirectLessonError(lessonId, "invalid_save");
+  }
+
+  const sectionGroupsRaw = formString(formData, "sectionGroupsJson");
+  let sectionGroups;
+  if (sectionGroupsRaw.length > 0) {
+    try {
+      sectionGroups = parseSectionGroups(JSON.parse(sectionGroupsRaw));
+    } catch {
+      redirectLessonError(lessonId, "invalid_save");
+    }
+  }
+
+  try {
+    await updateLessonPlanContent({
+      teacherId: teacher.id,
+      lessonPlanId: lessonId,
+      content,
+      freeTextAsks: formString(formData, "freeTextAsks"),
+      moduleLabel: formString(formData, "moduleLabel"),
+      unitLabel: formString(formData, "unitLabel"),
+      lessonLabel: formString(formData, "lessonLabel"),
+      ...(sectionGroups !== undefined ? { sectionGroups } : {}),
+    });
+    await updateLessonPlanStatus({
+      teacherId: teacher.id,
+      lessonPlanId: lessonId,
+      status: "final",
+    });
+  } catch (error) {
+    console.error("finalizeLessonPlanAction failed", error);
+    redirectLessonError(lessonId, "finalize_failed");
+  }
+
+  revalidatePath("/lessons");
+  revalidatePath(`/lessons/${lessonId}`);
+  redirect(`/lessons/${lessonId}?finished=1`);
+}
+
+/** Move a finished plan back to drafts for more edits. */
+export async function reopenLessonPlanAction(formData: FormData) {
+  const teacher = await getCurrentTeacher();
+  const lessonId = formString(formData, "lessonId");
+  if (!lessonId) {
+    redirectLessonsError("missing_lesson");
+  }
+
+  try {
+    await updateLessonPlanStatus({
+      teacherId: teacher.id,
+      lessonPlanId: lessonId,
+      status: "draft",
+    });
+  } catch (error) {
+    console.error("reopenLessonPlanAction failed", error);
+    redirectLessonError(lessonId, "reopen_failed");
+  }
+
+  revalidatePath("/lessons");
+  revalidatePath(`/lessons/${lessonId}`);
+  redirect(`/lessons/${lessonId}?reopened=1`);
 }
 
 export async function deleteLessonPlanAction(formData: FormData) {
