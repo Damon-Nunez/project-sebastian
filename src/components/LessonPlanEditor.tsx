@@ -1795,16 +1795,10 @@ export function LessonPlanEditor({
 
         <div className="flex flex-wrap items-center justify-end gap-3">
           <a
-            href={`/lessons/${lessonId}/export?format=docx`}
+            href={`/lessons/${lessonId}/export`}
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
           >
             Download .docx
-          </a>
-          <a
-            href={`/lessons/${lessonId}/export?format=pdf`}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-          >
-            Download .pdf
           </a>
           {!isFinished ? (
             <>

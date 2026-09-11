@@ -9,7 +9,7 @@ export type NormalizedExportImage = {
 
 /**
  * Normalize any supported upload (PNG/JPEG/WebP/GIF) to PNG or JPEG so
- * pdf-lib + docx ImageRun can embed it. Prefer PNG to keep transparency.
+ * docx ImageRun can embed it. Prefer PNG to keep transparency.
  */
 export async function normalizeImageForExport(
   bytes: Uint8Array,
@@ -18,7 +18,7 @@ export async function normalizeImageForExport(
   if (!bytes || bytes.byteLength === 0) return null;
 
   const sniffed = sniffImageKind(bytes);
-  // Already embeddable as-is for both pdf-lib and docx.
+  // Already embeddable as-is for docx.
   if (sniffed === "jpg") {
     return {
       bytes,

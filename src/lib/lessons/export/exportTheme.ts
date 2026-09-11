@@ -1,24 +1,7 @@
 /**
- * Shared default export theme for lesson plan PDF + DOCX.
+ * Shared default export theme for lesson plan DOCX.
  * Hierarchy only — no teacher-specific accent colors in V1.
  */
-
-/** pdf-lib / CSS-ish pt sizes */
-export const EXPORT_THEME = {
-  titleSize: 20,
-  subtitleSize: 11,
-  sectionHeadingSize: 14,
-  bodySize: 11,
-  captionSize: 9,
-  linkSize: 10,
-  /** Extra gap after title block before first section */
-  afterTitleGap: 10,
-  afterSubtitleGap: 16,
-  afterSectionHeadingGap: 8,
-  afterBodyGap: 10,
-  /** Extra vertical space for a blank line in the body (PDF). */
-  blankLineExtra: 6,
-} as const;
 
 /** docx half-points (size * 2) */
 export const EXPORT_THEME_DOCX = {
@@ -40,9 +23,6 @@ export const EXPORT_THEME_DOCX = {
 } as const;
 
 export const EXPORT_COLORS = {
-  text: { r: 0.1, g: 0.1, b: 0.12 },
-  heading: { r: 0.08, g: 0.09, b: 0.12 },
-  link: { r: 0.05, g: 0.35, b: 0.75 },
   /** DOCX hex without # */
   textHex: "1A1A1F",
   headingHex: "14151A",

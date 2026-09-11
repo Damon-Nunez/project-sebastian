@@ -36,7 +36,15 @@ async function readPublicAssetBytes(
   publicPath: string,
 ): Promise<Uint8Array | null> {
   try {
-    const full = path.join(process.cwd(), "public", publicPath);
+    const publicRoot = path.resolve(process.cwd(), "public");
+    const full = path.resolve(publicRoot, publicPath);
+    const rootPrefix = publicRoot.endsWith(path.sep)
+      ? publicRoot
+      : publicRoot + path.sep;
+    if (full !== publicRoot && !full.startsWith(rootPrefix)) {
+      console.error("export public asset path escaped public/", publicPath);
+      return null;
+    }
     return new Uint8Array(await fs.readFile(full));
   } catch (error) {
     console.error("export public asset read failed", publicPath, error);

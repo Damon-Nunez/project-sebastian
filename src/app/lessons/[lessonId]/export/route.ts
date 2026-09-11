@@ -4,31 +4,24 @@ import {
   TeacherAuthError,
 } from "@/lib/auth/getCurrentTeacher";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
-import {
-  buildLessonPlanExport,
-  type LessonExportFormat,
-} from "@/lib/lessons/export";
+import { buildLessonPlanExport } from "@/lib/lessons/export";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
 
 type RouteContext = {
   params: Promise<{ lessonId: string }>;
 };
 
-function parseFormat(raw: string | null): LessonExportFormat | null {
-  if (raw === "docx" || raw === "pdf") return raw;
-  return null;
-}
-
 /**
- * GET /lessons/[lessonId]/export?format=docx|pdf
- * Auth-gated download of the current Edited lesson plan.
+ * GET /lessons/[lessonId]/export
+ * Auth-gated .docx download of the current Edited lesson plan.
+ * Optional ?format=docx is accepted for older links; PDF export was removed.
  */
 export async function GET(request: Request, context: RouteContext) {
   const { lessonId } = await context.params;
-  const format = parseFormat(new URL(request.url).searchParams.get("format"));
-  if (!format) {
+  const format = new URL(request.url).searchParams.get("format");
+  if (format != null && format !== "docx") {
     return NextResponse.json(
-      { error: "Use format=docx or format=pdf" },
+      { error: "Only .docx export is supported. Convert to PDF from Word or Google Docs if needed." },
       { status: 400 },
     );
   }
@@ -51,7 +44,6 @@ export async function GET(request: Request, context: RouteContext) {
   const content = parseLessonPlanContent(plan.content);
   const file = await buildLessonPlanExport({
     content,
-    format,
     labels: {
       moduleLabel: plan.module_label,
       unitLabel: plan.unit_label,

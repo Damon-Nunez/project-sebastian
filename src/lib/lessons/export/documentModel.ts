@@ -129,7 +129,6 @@ export function formatLessonPlanExportTitle(
 
 export function formatLessonPlanExportFilename(
   labels: LessonPlanExportLabels,
-  extension: "docx" | "pdf",
 ): string {
   const bits = [
     labels.moduleLabel?.trim()
@@ -142,7 +141,7 @@ export function formatLessonPlanExportFilename(
   ].filter(Boolean);
   const base = bits.length > 0 ? bits.join("-") : "lesson-plan";
   const safe = base.replace(/[^\w.\-]+/g, "_");
-  return `${safe}.${extension}`;
+  return `${safe}.docx`;
 }
 
 function isLearningTargetsExtra(label: string): boolean {
