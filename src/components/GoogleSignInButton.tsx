@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GOOGLE_DRIVE_FILE_SCOPE } from "@/lib/auth/googleDriveScopes";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type GoogleSignInButtonProps = {
@@ -23,6 +24,7 @@ export function GoogleSignInButton({ nextPath = "/" }: GoogleSignInButtonProps) 
         provider: "google",
         options: {
           redirectTo,
+          scopes: GOOGLE_DRIVE_FILE_SCOPE,
           queryParams: {
             access_type: "offline",
             prompt: "consent",

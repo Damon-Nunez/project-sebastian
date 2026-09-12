@@ -292,6 +292,33 @@ export async function updateLessonPlanStatus(input: {
   return asPlanRow(data as Record<string, unknown>);
 }
 
+/** Persist Google Drive file id after a successful upload (SCRUM-87). */
+export async function updateLessonPlanDriveFileId(input: {
+  teacherId: string;
+  lessonPlanId: string;
+  driveFileId: string;
+}): Promise<LessonPlanRow> {
+  const admin = createAdminSupabaseClient();
+  const now = new Date().toISOString();
+
+  const { data, error } = await admin
+    .from("lesson_plans")
+    .update({ drive_file_id: input.driveFileId, updated_at: now })
+    .eq("teacher_id", input.teacherId)
+    .eq("id", input.lessonPlanId)
+    .select(PLAN_SELECT)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to save Drive file id: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error("Lesson plan not found");
+  }
+
+  return asPlanRow(data as Record<string, unknown>);
+}
+
 /**
  * Delete a lesson plan owned by the teacher, plus linked document rows.
  * Documents FK is ON DELETE SET NULL — we remove them explicitly.

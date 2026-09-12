@@ -22,6 +22,11 @@ const anthropicEnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1),
 });
 
+const googleOAuthEnvSchema = z.object({
+  GOOGLE_CLIENT_ID: z.string().min(1),
+  GOOGLE_CLIENT_SECRET: z.string().min(1),
+});
+
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 export function getServerEnv(): ServerEnv {
@@ -57,4 +62,15 @@ export function requireAnthropicEnv() {
 /** True when the Anthropic key is present — does not call the API. */
 export function isAnthropicConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+}
+
+/**
+ * Same Google OAuth client as Supabase Auth → Providers → Google.
+ * Needed so the app can refresh Drive provider tokens (Supabase does not).
+ */
+export function requireGoogleOAuthEnv() {
+  return googleOAuthEnvSchema.parse({
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  });
 }

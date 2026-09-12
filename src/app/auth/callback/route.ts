@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isEmailAllowed, parseAllowlist } from "@/lib/auth/allowlist";
+import { persistTeacherGoogleTokensFromSession } from "@/lib/auth/googleDrive";
 import { syncTeacherFromAuthUser } from "@/lib/auth/syncTeacher";
 import { createSessionClient } from "@/lib/supabase/server";
 
@@ -32,6 +33,17 @@ export async function GET(request: Request) {
   } catch {
     await supabase.auth.signOut();
     return NextResponse.redirect(`${origin}/login?error=teacher_sync`);
+  }
+
+  // Drive tokens are best-effort: login still works if migration/env isn't ready yet.
+  try {
+    await persistTeacherGoogleTokensFromSession({
+      authUserId: data.user.id,
+      accessToken: data.session?.provider_token,
+      refreshToken: data.session?.provider_refresh_token,
+    });
+  } catch (err) {
+    console.error("Failed to persist Google Drive tokens", err);
   }
 
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";

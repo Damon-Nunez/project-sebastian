@@ -16,6 +16,7 @@ type LessonPageProps = {
     saved?: string;
     polished?: string;
     finished?: string;
+    drive?: string;
     reopened?: string;
     error?: string;
   }>;
@@ -26,7 +27,8 @@ export default async function LessonDetailPage({
   searchParams,
 }: LessonPageProps) {
   const { lessonId } = await params;
-  const { saved, polished, finished, reopened, error } = await searchParams;
+  const { saved, polished, finished, drive, reopened, error } =
+    await searchParams;
   const errorMessage = lessonErrorMessage(error);
   const teacher = await getCurrentTeacher();
   const plan = await getLessonPlanForTeacher(teacher.id, lessonId);
@@ -102,6 +104,20 @@ export default async function LessonDetailPage({
         >
           Marked finished — now under Finished on the Lessons page (Sebastian
           local save).
+          {drive === "ok"
+            ? " Also uploaded to your Google Drive Sebastian folder."
+            : null}
+        </p>
+      ) : null}
+
+      {finished && drive === "failed" ? (
+        <p
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          Google Drive upload didn&apos;t complete. Your plan is still saved as
+          Finished locally — move it back to drafts and mark finished again to
+          re-upload, or try again after reconnecting Google.
         </p>
       ) : null}
 

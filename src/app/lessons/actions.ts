@@ -14,8 +14,11 @@ import {
   createLessonPlanFromFrameworkUpload,
   deleteLessonPlanForTeacher,
   updateLessonPlanContent,
+  updateLessonPlanDriveFileId,
   updateLessonPlanStatus,
 } from "@/lib/lessons/plans";
+import { buildLessonPlanExport } from "@/lib/lessons/export";
+import { uploadLessonPlanDocxToDrive } from "@/lib/lessons/driveUpload";
 import { polishAndSaveLessonPlan } from "@/lib/lessons/polishAndSaveLessonPlan";
 import { parseOptionalRoutines } from "@/lib/lessons/optionalRoutines";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
@@ -198,7 +201,7 @@ export async function polishLessonPlanAction(formData: FormData) {
   redirect(`/lessons/${lessonId}?polished=1`);
 }
 
-/** Trax 2.3 — move plan into Sebastian Local Save (FINISHED). */
+/** Trax 2.3 / 2.5 — FINISHED locally, then best-effort Drive upload. */
 export async function finalizeLessonPlanAction(formData: FormData) {
   const teacher = await getCurrentTeacher();
   const lessonId = formString(formData, "lessonId");
@@ -233,15 +236,19 @@ export async function finalizeLessonPlanAction(formData: FormData) {
     redirectLessonError(lessonId, "invalid_save");
   }
 
+  const moduleLabel = formString(formData, "moduleLabel");
+  const unitLabel = formString(formData, "unitLabel");
+  const lessonLabel = formString(formData, "lessonLabel");
+
   try {
     await updateLessonPlanContent({
       teacherId: teacher.id,
       lessonPlanId: lessonId,
       content,
       freeTextAsks: formString(formData, "freeTextAsks"),
-      moduleLabel: formString(formData, "moduleLabel"),
-      unitLabel: formString(formData, "unitLabel"),
-      lessonLabel: formString(formData, "lessonLabel"),
+      moduleLabel,
+      unitLabel,
+      lessonLabel,
       ...(sectionGroups !== undefined ? { sectionGroups } : {}),
       ...(optionalRoutines !== undefined ? { optionalRoutines } : {}),
     });
@@ -255,9 +262,33 @@ export async function finalizeLessonPlanAction(formData: FormData) {
     redirectLessonError(lessonId, "finalize_failed");
   }
 
+  // Soft-fail: local FINISHED already succeeded; Drive is best-effort.
+  let driveStatus: "ok" | "failed" = "failed";
+  try {
+    const file = await buildLessonPlanExport({
+      content,
+      labels: { moduleLabel, unitLabel, lessonLabel },
+    });
+    const uploaded = await uploadLessonPlanDocxToDrive({
+      teacherId: teacher.id,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      bytes: file.bytes,
+    });
+    await updateLessonPlanDriveFileId({
+      teacherId: teacher.id,
+      lessonPlanId: lessonId,
+      driveFileId: uploaded.driveFileId,
+    });
+    driveStatus = "ok";
+  } catch (error) {
+    console.error("finalizeLessonPlanAction Drive upload failed", error);
+    driveStatus = "failed";
+  }
+
   revalidatePath("/lessons");
   revalidatePath(`/lessons/${lessonId}`);
-  redirect(`/lessons/${lessonId}?finished=1`);
+  redirect(`/lessons/${lessonId}?finished=1&drive=${driveStatus}`);
 }
 
 /** Move a finished plan back to drafts for more edits. */
