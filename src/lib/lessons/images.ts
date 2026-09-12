@@ -37,7 +37,7 @@ export function isAllowedLessonImageMime(mime: string): boolean {
   return ALLOWED_MIME.has(mime.toLowerCase());
 }
 
-function extensionFor(mime: string, filename: string): string {
+export function extensionFor(mime: string, filename: string): string {
   const fromMime = EXT_BY_MIME[mime.toLowerCase()];
   if (fromMime) return fromMime;
   const match = filename.toLowerCase().match(/\.([a-z0-9]+)$/);

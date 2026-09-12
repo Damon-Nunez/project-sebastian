@@ -31,11 +31,7 @@ import {
   removeLessonPlanLink,
 } from "@/lib/lessons/links";
 
-function formString(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
-}
-
+import { formString } from "@/lib/actionHelpers";
 function parseOptionalRoutinesFromForm(formData: FormData) {
   const raw = formString(formData, "optionalRoutinesJson");
   if (raw.length === 0) return undefined;

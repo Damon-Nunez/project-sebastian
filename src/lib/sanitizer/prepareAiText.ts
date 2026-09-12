@@ -27,7 +27,7 @@ export function prepareTextForAi(
   return { sanitizedText, map };
 }
 
-/** Restore real names in AI output (or sanitized text) for on-screen display. */
+/** @deprecated Use `rehydrate` from @/lib/sanitizer directly. */
 export function rehydratePreparedAiText(
   text: string,
   map: NameTokenMap,

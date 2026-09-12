@@ -1,4 +1,8 @@
 import { createAiMessage } from "@/lib/ai/createAiMessage";
+import {
+  extractJsonObject,
+  messageText,
+} from "@/lib/ai/parseLlmJson";
 import { prepareTextForAi } from "@/lib/sanitizer/prepareAiText";
 import {
   FRAMEWORK_LLM_JSON_SHAPE,
@@ -33,26 +37,6 @@ Rules:
 - Return ONLY valid JSON matching this shape (no markdown fences, no commentary):
 ${FRAMEWORK_LLM_JSON_SHAPE}`;
 
-function extractJsonObject(raw: string): unknown {
-  const trimmed = raw.trim();
-  const fence = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/i);
-  const body = fence?.[1]?.trim() ?? trimmed;
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
-  if (start < 0 || end < start) {
-    throw new Error("LLM framework parse returned no JSON object");
-  }
-  return JSON.parse(body.slice(start, end + 1)) as unknown;
-}
-
-function messageText(
-  content: { type: string; text?: string }[],
-): string {
-  return content
-    .filter((block) => block.type === "text" && typeof block.text === "string")
-    .map((block) => block.text!)
-    .join("\n");
-}
 
 export type ParseFrameworkWithLlmResult = {
   buckets: FrameworkLlmBuckets;
@@ -78,23 +62,21 @@ export async function parseFrameworkWithLlm(input: {
 
   const model = input.model ?? FRAMEWORK_PARSE_MODEL;
   const teacherId = input.teacherId ?? "framework-parse-trial";
-  const prepared = prepareTextForAi(text, []);
 
   const userPrompt = [
     input.filename ? `Source filename: ${input.filename}` : null,
     "Sort the following extracted framework text into the JSON buckets.",
     "",
     "---FRAMEWORK TEXT---",
-    prepared.sanitizedText,
+    text,
     "---END FRAMEWORK TEXT---",
   ]
     .filter(Boolean)
     .join("\n");
 
-  // Re-prepare after wrapping so createAiMessage still receives PreparedAiText.
-  const preparedWrapped = prepareTextForAi(userPrompt, []);
+  const prepared = prepareTextForAi(userPrompt, []);
 
-  const message = await createAiMessage(teacherId, preparedWrapped, {
+  const message = await createAiMessage(teacherId, prepared, {
     system: SYSTEM_PROMPT,
     model,
     maxTokens: 8192,

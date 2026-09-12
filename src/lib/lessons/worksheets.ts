@@ -7,6 +7,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { LessonWorksheetRow } from "@/lib/db/types";
 import {
   isAllowedLessonImageMime,
+  extensionFor,
   LESSON_PLAN_IMAGES_BUCKET,
   MAX_LESSON_IMAGE_BYTES,
 } from "./images";
@@ -63,19 +64,6 @@ export async function signLessonWorksheets(
   return urls;
 }
 
-function extensionFor(mime: string, filename: string): string {
-  const map: Record<string, string> = {
-    "image/png": "png",
-    "image/jpeg": "jpg",
-    "image/jpg": "jpg",
-    "image/webp": "webp",
-    "image/gif": "gif",
-  };
-  const fromMime = map[mime.toLowerCase()];
-  if (fromMime) return fromMime;
-  const match = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
-  return match?.[1] ?? "bin";
-}
 
 export async function uploadLessonWorksheet(input: {
   teacherId: string;

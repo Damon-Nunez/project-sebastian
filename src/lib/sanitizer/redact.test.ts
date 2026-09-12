@@ -7,11 +7,11 @@ import {
   prepareTextForAi,
   redact,
   rehydrate,
-  rehydratePreparedAiText,
-  sanitizeForAi,
   SanitizerVerificationError,
   tokenForStudentId,
 } from "./index";
+import { rehydratePreparedAiText } from "./prepareAiText";
+import { sanitizeForAi } from "./redact";
 import type { RosterStudent } from "./types";
 
 const maria: RosterStudent = {

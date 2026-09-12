@@ -3,7 +3,6 @@ export {
   buildNameTokenMap,
   redact,
   rehydrate,
-  sanitizeForAi,
   tokenForStudentId,
 } from "./redact";
 export {
@@ -17,7 +16,6 @@ export {
 } from "./names";
 export {
   prepareTextForAi,
-  rehydratePreparedAiText,
 } from "./prepareAiText";
 export type { PreparedAiText } from "./prepareAiText";
 export {

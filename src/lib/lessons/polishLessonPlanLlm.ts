@@ -1,9 +1,11 @@
 import { DEFAULT_AI_MODEL } from "@/lib/ai/getAiClient";
 import { createAiMessage } from "@/lib/ai/createAiMessage";
 import {
-  prepareTextForAi,
-  rehydratePreparedAiText,
-} from "@/lib/sanitizer/prepareAiText";
+  extractJsonObject,
+  messageText,
+} from "@/lib/ai/parseLlmJson";
+import { prepareTextForAi } from "@/lib/sanitizer/prepareAiText";
+import { rehydrate } from "@/lib/sanitizer";
 import type { RosterStudent } from "@/lib/sanitizer/types";
 import type { LessonPlanContent } from "./content";
 import type { OptionalRoutines } from "./optionalRoutines";
@@ -52,26 +54,6 @@ Hard rules:
 - Return ONLY valid JSON matching this shape (no markdown fences, no commentary):
 ${POLISH_FIELDS_JSON_SHAPE}`;
 
-function extractJsonObject(raw: string): unknown {
-  const trimmed = raw.trim();
-  const fence = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/i);
-  const body = fence?.[1]?.trim() ?? trimmed;
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
-  if (start < 0 || end < start) {
-    throw new Error("LLM lesson polish returned no JSON object");
-  }
-  return JSON.parse(body.slice(start, end + 1)) as unknown;
-}
-
-function messageText(
-  content: { type: string; text?: string }[],
-): string {
-  return content
-    .filter((block) => block.type === "text" && typeof block.text === "string")
-    .map((block) => block.text!)
-    .join("\n");
-}
 
 /** Ensure the model cannot drop/reorder Work Time keys. */
 export function assertWorkTimeKeysPreserved(
@@ -160,7 +142,7 @@ export async function polishLessonPlanWithLlm(input: {
   assertWorkTimeKeysPreserved(fields, polishedRaw);
 
   const polished = rehydratePolishFields(polishedRaw, (text) =>
-    rehydratePreparedAiText(text, prepared.map),
+    rehydrate(text, prepared.map),
   );
 
   return {

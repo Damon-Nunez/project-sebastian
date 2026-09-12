@@ -21,7 +21,7 @@ import {
   type BodyViewMode,
   type LessonPlanContent,
 } from "@/lib/lessons/content";
-import { DIFFERENTIATION_IMAGES } from "@/lib/lessons/differentiation";
+import { DIFFERENTIATION_IMAGES } from "@/lib/lessons/standardRubric";
 import { LESSON_ERROR_MESSAGES, type LessonErrorCode } from "@/lib/lessons/errors";
 import {
   imageSectionOptionsForContent,

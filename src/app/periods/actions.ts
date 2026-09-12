@@ -15,11 +15,7 @@ import {
   updateStudent,
 } from "@/lib/roster/students";
 
-function formString(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
-}
-
+import { formString } from "@/lib/actionHelpers";
 export async function createPeriodAction(formData: FormData) {
   const teacher = await getCurrentTeacher();
   const period = await createPeriod({
