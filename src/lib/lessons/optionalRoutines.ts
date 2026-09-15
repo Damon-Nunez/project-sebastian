@@ -191,7 +191,9 @@ export function formatRoutineScript(
 ): string {
   const prompts = block.prompts.trim();
   const questions = prompts.length > 0 ? prompts : "(Add discussion questions)";
-  return [ROUTINE_HEADING[kind], "QUESTIONS", questions].join("\n");
+  // Blank line after the heading so TURN AND TALK / THINK-PAIR-SHARE
+  // sits apart from QUESTIONS + prompt text in preview and export.
+  return [ROUTINE_HEADING[kind], "", "QUESTIONS", questions].join("\n");
 }
 
 function removeScriptFromBody(body: string, script: string): string {

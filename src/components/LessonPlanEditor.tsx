@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import {
   addLessonPlanLinkAction,
   finalizeLessonPlanAction,
@@ -414,6 +420,7 @@ export function LessonPlanEditor({
   const [imageSectionKey, setImageSectionKey] = useState("opening");
   const [imageCaption, setImageCaption] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageMessage, setImageMessage] = useState<string | null>(null);
   const [linkSectionKey, setLinkSectionKey] = useState("opening");
@@ -505,6 +512,9 @@ export function LessonPlanEditor({
       }
       setImageFile(null);
       setImageCaption("");
+      if (imageFileInputRef.current) {
+        imageFileInputRef.current.value = "";
+      }
       setImageMessage("Image added under that section.");
     } catch (error) {
       console.error(error);
@@ -958,6 +968,29 @@ export function LessonPlanEditor({
           type — then hit <span className="font-medium text-slate-700">Preview final draft</span>{" "}
           to see the whole Edited plan again.
         </p>
+
+        {!isFinished ? (
+          <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/70 px-4 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">
+                  Polish with AI
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-600">
+                  Fast-forward the draft — tighten wording, weave routines, and
+                  clean the plan before you fine-tune fields below.
+                </p>
+              </div>
+              <PendingSubmitButton
+                formAction={polishLessonPlanAction}
+                idleLabel="Polish with AI"
+                pendingLabel="Polishing…"
+                className="shrink-0 rounded-lg bg-sky-800 px-4 py-2 text-sm font-medium text-white hover:bg-sky-900 disabled:cursor-wait disabled:opacity-70"
+              />
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className={labelClass}>Date</span>
@@ -1450,6 +1483,7 @@ export function LessonPlanEditor({
           <label className="block sm:col-span-2">
             <span className={labelClass}>Image file</span>
             <input
+              ref={imageFileInputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
               className={`${inputClass} file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700`}
@@ -1758,7 +1792,30 @@ export function LessonPlanEditor({
         </div>
       </div>
 
-      <form action={saveLessonPlanAction} className="space-y-4">
+      <form
+        action={saveLessonPlanAction}
+        className="space-y-4"
+        onKeyDown={(e: KeyboardEvent<HTMLFormElement>) => {
+          // Enter in single-line text inputs would submit this form and re-render.
+          // Only block that case — leave textareas, buttons, links, and selects alone.
+          if (e.key !== "Enter") return;
+          const target = e.target as HTMLElement;
+          if (target.tagName !== "INPUT") return;
+          const type = ((target as HTMLInputElement).type || "text").toLowerCase();
+          if (
+            type === "submit" ||
+            type === "button" ||
+            type === "reset" ||
+            type === "checkbox" ||
+            type === "radio" ||
+            type === "file" ||
+            type === "image"
+          ) {
+            return;
+          }
+          e.preventDefault();
+        }}
+      >
         <input type="hidden" name="lessonId" value={lessonId} />
         <input
           type="hidden"
@@ -1802,12 +1859,6 @@ export function LessonPlanEditor({
           </a>
           {!isFinished ? (
             <>
-              <PendingSubmitButton
-                formAction={polishLessonPlanAction}
-                idleLabel="Polish with AI"
-                pendingLabel="Polishing…"
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-              />
               <PendingSubmitButton
                 idleLabel="Save draft"
                 pendingLabel="Saving…"
