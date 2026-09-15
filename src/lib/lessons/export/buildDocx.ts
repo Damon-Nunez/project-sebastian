@@ -1,11 +1,16 @@
 import {
+  BorderStyle,
   Document,
   ExternalHyperlink,
   HeadingLevel,
   ImageRun,
   Packer,
   Paragraph,
+  Table,
+  TableCell,
+  TableRow,
   TextRun,
+  WidthType,
 } from "docx";
 import {
   EXPORT_COLORS,
@@ -13,6 +18,7 @@ import {
   isRoutineHeadingLine,
   splitBodyLines,
 } from "./exportTheme";
+import type { LessonPlanExportHeader } from "./documentModel";
 import type { HydratedLessonPlanExportDocument } from "./hydrateAssets";
 import {
   fitImageSize,
@@ -21,6 +27,112 @@ import {
   sniffImageKind,
 } from "./imageSizing";
 
+function headerCellParagraphs(lines: { bold?: string; text?: string }[]): Paragraph[] {
+  if (lines.length === 0) {
+    return [
+      new Paragraph({
+        children: [new TextRun({ text: " ", size: EXPORT_THEME_DOCX.bodySize })],
+      }),
+    ];
+  }
+  return lines.map(
+    (line) =>
+      new Paragraph({
+        spacing: { after: 40 },
+        children: [
+          ...(line.bold
+            ? [
+                new TextRun({
+                  text: line.bold,
+                  bold: true,
+                  size: EXPORT_THEME_DOCX.bodySize,
+                  color: EXPORT_COLORS.textHex,
+                }),
+                new TextRun({
+                  text: line.text ? ` ${line.text}` : "",
+                  size: EXPORT_THEME_DOCX.bodySize,
+                  color: EXPORT_COLORS.textHex,
+                }),
+              ]
+            : [
+                new TextRun({
+                  text: line.text ?? " ",
+                  size: EXPORT_THEME_DOCX.bodySize,
+                  color: EXPORT_COLORS.textHex,
+                }),
+              ]),
+        ],
+      }),
+  );
+}
+
+function headerTable(header: LessonPlanExportHeader): Table {
+  // docx percentage widths often collapse in Word/Google Docs — use DXA (twips).
+  // ~6.5" content width for US Letter with ~1" margins.
+  const TABLE_WIDTH_DXA = 9360;
+  const CELL_WIDTH_DXA = TABLE_WIDTH_DXA / 2;
+
+  const border = {
+    style: BorderStyle.SINGLE,
+    size: 8,
+    color: "000000",
+  };
+  const borders = {
+    top: border,
+    bottom: border,
+    left: border,
+    right: border,
+  };
+  const cell = (lines: { bold?: string; text?: string }[]) =>
+    new TableCell({
+      borders,
+      width: { size: CELL_WIDTH_DXA, type: WidthType.DXA },
+      children: headerCellParagraphs(lines),
+    });
+
+  const topLeft: { bold?: string; text?: string }[] = [];
+  if (header.subject) {
+    topLeft.push({ bold: "SUBJECT:", text: header.subject });
+  }
+  if (header.moduleUnitLine) {
+    topLeft.push({ text: header.moduleUnitLine });
+  }
+  if (header.lessonLine) {
+    topLeft.push({ bold: header.lessonLine });
+  }
+
+  const topRight: { bold?: string; text?: string }[] = [];
+  if (header.gradeLabel) {
+    topRight.push({ bold: "Grade:", text: header.gradeLabel });
+  }
+  if (header.textTitle) {
+    topRight.push({ bold: "Text:", text: header.textTitle });
+  }
+
+  const bottomLeft: { bold?: string; text?: string }[] = [];
+  if (header.teacherLine) {
+    bottomLeft.push({ bold: "Teacher:", text: header.teacherLine });
+  }
+
+  const bottomRight: { bold?: string; text?: string }[] = [];
+  if (header.timeFrame) {
+    bottomRight.push({ bold: "Time Frame to Complete Lesson:" });
+    bottomRight.push({ text: header.timeFrame });
+  }
+
+  return new Table({
+    width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
+    columnWidths: [CELL_WIDTH_DXA, CELL_WIDTH_DXA],
+    rows: [
+      new TableRow({
+        children: [cell(topLeft), cell(topRight)],
+      }),
+      new TableRow({
+        children: [cell(bottomLeft), cell(bottomRight)],
+      }),
+    ],
+  });
+}
 function paragraphsFromBody(body: string): Paragraph[] {
   if (!body) return [];
   return splitBodyLines(body).map((line) => {
@@ -192,7 +304,7 @@ function attachmentParagraphs(
 export async function buildLessonPlanDocx(
   doc: HydratedLessonPlanExportDocument,
 ): Promise<Buffer> {
-  const children: Paragraph[] = [
+  const children: (Paragraph | Table)[] = [
     new Paragraph({
       heading: HeadingLevel.TITLE,
       spacing: { after: EXPORT_THEME_DOCX.afterTitle },
@@ -219,6 +331,16 @@ export async function buildLessonPlanDocx(
             color: EXPORT_COLORS.textHex,
           }),
         ],
+      }),
+    );
+  }
+
+  if (doc.header) {
+    children.push(headerTable(doc.header));
+    children.push(
+      new Paragraph({
+        spacing: { after: EXPORT_THEME_DOCX.afterSubtitle },
+        children: [],
       }),
     );
   }

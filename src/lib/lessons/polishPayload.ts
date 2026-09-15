@@ -85,7 +85,8 @@ export function extractPolishFields(content: LessonPlanContent): PolishFields {
 /**
  * Merge polished fields into content.
  * Preserves images, links, bodyOriginal, bodySimplified, lessonDate, version,
- * workTimesReservoir, and work-time keys/order from the source plan.
+ * workTimesReservoir, header chrome (subject/grade/teacher/text/timeFrame),
+ * and work-time keys/order from the source plan.
  */
 export function applyPolishFields(
   content: LessonPlanContent,

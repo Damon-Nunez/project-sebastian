@@ -1,7 +1,8 @@
-import type { DocumentRow, LessonPlanRow } from "@/lib/db/types";
+import type { DocumentRow, LessonPlanRow, TeacherRow } from "@/lib/db/types";
 import { isAnthropicConfigured } from "@/lib/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { parseLessonPlanContent, type LessonPlanContent } from "./content";
+import { withHeaderDefaults } from "./headerDefaults";
 import {
   parseOptionalRoutines,
   pruneOptionalRoutines,
@@ -27,6 +28,9 @@ const PLAN_SELECT =
 
 const DOCUMENT_SELECT =
   "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, created_at, updated_at";
+
+const TEACHER_HEADER_SELECT =
+  "id, subject, grade_label, honorific, display_name";
 
 const MAX_FRAMEWORK_BYTES = 20 * 1024 * 1024;
 
@@ -134,7 +138,7 @@ export async function createLessonPlanFromFrameworkUpload(input: {
     buffer: input.bytes,
     filename: input.filename,
   });
-  const content = await parseFrameworkContentForUpload({
+  let content = await parseFrameworkContentForUpload({
     teacherId: input.teacherId,
     filename: input.filename,
     text: extracted.text,
@@ -147,6 +151,33 @@ export async function createLessonPlanFromFrameworkUpload(input: {
 
   const admin = createAdminSupabaseClient();
   const now = new Date().toISOString();
+
+  const { data: teacherData } = await admin
+    .from("teachers")
+    .select(TEACHER_HEADER_SELECT)
+    .eq("id", input.teacherId)
+    .maybeSingle();
+
+  if (teacherData) {
+    const teacher = teacherData as Pick<
+      TeacherRow,
+      "subject" | "grade_label" | "honorific" | "display_name"
+    >;
+    content = withHeaderDefaults(content, teacher, {
+      textTitle: content.textTitle,
+    });
+  } else {
+    content = withHeaderDefaults(
+      content,
+      {
+        subject: null,
+        grade_label: null,
+        honorific: null,
+        display_name: null,
+      },
+      { textTitle: content.textTitle },
+    );
+  }
 
   const { data: planData, error: planError } = await admin
     .from("lesson_plans")

@@ -12,6 +12,12 @@ export type TeacherRow = {
   id: string;
   email: string | null;
   display_name: string | null;
+  /** Default lesson header subject (migration 016). */
+  subject: string | null;
+  /** Default lesson header grade band, e.g. "8th Grade" (migration 016). */
+  grade_label: string | null;
+  /** Explicit Mr / Ms / Mx — never inferred (migration 016). */
+  honorific: string | null;
   auth_user_id: string | null;
   api_key_encrypted: string | null;
   usage_tokens: number | null;

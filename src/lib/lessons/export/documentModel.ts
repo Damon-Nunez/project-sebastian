@@ -36,7 +36,19 @@ export type ExportSection = {
 export type LessonPlanExportDocument = {
   title: string;
   subtitle: string | null;
+  /** District-style header chrome (2×2 cells). */
+  header: LessonPlanExportHeader | null;
   sections: ExportSection[];
+};
+
+export type LessonPlanExportHeader = {
+  subject: string;
+  moduleUnitLine: string;
+  lessonLine: string;
+  gradeLabel: string;
+  textTitle: string;
+  teacherLine: string;
+  timeFrame: string;
 };
 
 export type LessonPlanExportLabels = {
@@ -190,6 +202,39 @@ export function buildLessonPlanExportDocument(
     ? `Date: ${content.lessonDate}`
     : null;
 
+  const moduleUnitLine = [
+    labels.moduleLabel?.trim()
+      ? `Module ${labels.moduleLabel.trim()}`
+      : null,
+    labels.unitLabel?.trim() ? `Unit ${labels.unitLabel.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join(" - ");
+  const lessonLine = labels.lessonLabel?.trim()
+    ? `LESSON ${labels.lessonLabel.trim()}`
+    : "";
+
+  const headerHasContent =
+    content.subject.trim() ||
+    content.gradeLabel.trim() ||
+    content.teacherLine.trim() ||
+    content.textTitle.trim() ||
+    content.timeFrame.trim() ||
+    moduleUnitLine ||
+    lessonLine;
+
+  const header: LessonPlanExportHeader | null = headerHasContent
+    ? {
+        subject: content.subject.trim(),
+        moduleUnitLine,
+        lessonLine,
+        gradeLabel: content.gradeLabel.trim(),
+        textTitle: content.textTitle.trim(),
+        teacherLine: content.teacherLine.trim(),
+        timeFrame: content.timeFrame.trim(),
+      }
+    : null;
+
   const sections: ExportSection[] = [];
 
   pushSection(
@@ -303,5 +348,5 @@ export function buildLessonPlanExportDocument(
     images: orphanImages,
   });
 
-  return { title, subtitle, sections };
+  return { title, subtitle, header, sections };
 }

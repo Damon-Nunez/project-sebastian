@@ -16,7 +16,7 @@ export class TeacherAuthError extends Error {
 }
 
 const TEACHER_SELECT =
-  "id, email, display_name, auth_user_id, api_key_encrypted, usage_tokens, created_at, updated_at";
+  "id, email, display_name, subject, grade_label, honorific, auth_user_id, api_key_encrypted, usage_tokens, created_at, updated_at";
 
 /**
  * Resolve the signed-in Auth user → `teachers` row (domain PK).

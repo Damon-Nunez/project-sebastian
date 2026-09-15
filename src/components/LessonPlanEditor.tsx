@@ -753,6 +753,74 @@ export function LessonPlanEditor({
             Preview final draft
           </button>
         </div>
+
+        {(content.subject ||
+          content.gradeLabel ||
+          content.teacherLine ||
+          content.textTitle ||
+          content.timeFrame ||
+          moduleLabel ||
+          unitLabel ||
+          lessonLabel) && (
+          <div className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-slate-300 bg-slate-300 sm:grid-cols-2">
+            <div className="space-y-1 bg-slate-50 px-3 py-2.5 text-sm text-slate-800">
+              {content.subject ? (
+                <p>
+                  <span className="font-semibold">SUBJECT:</span>{" "}
+                  {content.subject}
+                </p>
+              ) : null}
+              {(moduleLabel || unitLabel) && (
+                <p>
+                  {[
+                    moduleLabel ? `Module ${moduleLabel}` : null,
+                    unitLabel ? `Unit ${unitLabel}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" - ")}
+                </p>
+              )}
+              {lessonLabel ? (
+                <p>
+                  <span className="font-semibold">LESSON</span> {lessonLabel}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-1 bg-slate-50 px-3 py-2.5 text-sm text-slate-800">
+              {content.gradeLabel ? (
+                <p>
+                  <span className="font-semibold">Grade:</span>{" "}
+                  {content.gradeLabel}
+                </p>
+              ) : null}
+              {content.textTitle ? (
+                <p>
+                  <span className="font-semibold">Text:</span>{" "}
+                  {content.textTitle}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-1 bg-slate-50 px-3 py-2.5 text-sm text-slate-800">
+              {content.teacherLine ? (
+                <p>
+                  <span className="font-semibold">Teacher:</span>{" "}
+                  {content.teacherLine}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-1 bg-slate-50 px-3 py-2.5 text-sm text-slate-800">
+              {content.timeFrame ? (
+                <>
+                  <p className="font-semibold">
+                    Time Frame to Complete Lesson:
+                  </p>
+                  <p>{content.timeFrame}</p>
+                </>
+              ) : null}
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
           <p className="text-xs text-slate-500">
             Swap Opening / Work Time / Closing here to copy or compare. Right side
@@ -1031,6 +1099,61 @@ export function LessonPlanEditor({
               value={lessonLabel}
               onChange={(e) => setLessonLabel(e.target.value)}
               placeholder="7"
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Subject</span>
+            <input
+              className={inputClass}
+              value={content.subject}
+              onChange={(e) =>
+                setContent((prev) => ({ ...prev, subject: e.target.value }))
+              }
+              placeholder="English Language Arts (ELA)"
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Grade</span>
+            <input
+              className={inputClass}
+              value={content.gradeLabel}
+              onChange={(e) =>
+                setContent((prev) => ({ ...prev, gradeLabel: e.target.value }))
+              }
+              placeholder="8th Grade"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Teacher</span>
+            <input
+              className={inputClass}
+              value={content.teacherLine}
+              onChange={(e) =>
+                setContent((prev) => ({ ...prev, teacherLine: e.target.value }))
+              }
+              placeholder="Mr Nunez"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Text</span>
+            <input
+              className={inputClass}
+              value={content.textTitle}
+              onChange={(e) =>
+                setContent((prev) => ({ ...prev, textTitle: e.target.value }))
+              }
+              placeholder="Summer of the Mariposas"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Time frame to complete lesson</span>
+            <input
+              className={inputClass}
+              value={content.timeFrame}
+              onChange={(e) =>
+                setContent((prev) => ({ ...prev, timeFrame: e.target.value }))
+              }
+              placeholder="1 class period"
             />
           </label>
         </div>

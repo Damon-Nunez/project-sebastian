@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth/getCurrentTeacher";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { buildLessonPlanExport } from "@/lib/lessons/export";
+import { withHeaderDefaults } from "@/lib/lessons/headerDefaults";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
 
 type RouteContext = {
@@ -41,7 +42,10 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const content = parseLessonPlanContent(plan.content);
+  const content = withHeaderDefaults(
+    parseLessonPlanContent(plan.content),
+    teacher,
+  );
   const file = await buildLessonPlanExport({
     content,
     labels: {

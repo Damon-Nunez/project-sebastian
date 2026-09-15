@@ -16,6 +16,11 @@ export const frameworkLlmBucketsSchema = z.object({
   module_label: z.string().nullable(),
   unit_label: z.string().nullable(),
   lesson_label: z.string().nullable(),
+  /**
+   * Anchor text / book title from the framework header (e.g. Summer of the Mariposas).
+   * Not the lesson number title — the core text students read.
+   */
+  textTitle: z.string().default(""),
   /** Lesson learning targets only (I can…). */
   learningTargets: z.string(),
   /** Short timed outline only — not Teaching Notes / Homework bodies. */
@@ -67,6 +72,7 @@ export const FRAMEWORK_LLM_JSON_SHAPE = `{
   "module_label": string | null,
   "unit_label": string | null,
   "lesson_label": string | null,
+  "textTitle": string,
   "learningTargets": string,
   "agenda": string,
   "opening": { "label": string, "body": string, "bodySimplified": string, "minutes": number | null },
@@ -155,6 +161,7 @@ export function bucketsToLessonPlanContent(
 
   return {
     ...base,
+    textTitle: buckets.textTitle.trim(),
     standards: buckets.standardsCodes
       .map((c) => c.trim())
       .filter(Boolean)

@@ -76,6 +76,16 @@ const lessonDateSchema = z
 export const lessonPlanContentSchema = z.object({
   version: z.literal(1),
   lessonDate: lessonDateSchema,
+  /** District header: subject (often from teacher profile default). */
+  subject: z.string().default(""),
+  /** District header: grade band, e.g. "8th Grade". */
+  gradeLabel: z.string().default(""),
+  /** District header: "Mr Nunez" / free-text co-teacher line. */
+  teacherLine: z.string().default(""),
+  /** District header: anchor text / book title (from framework when known). */
+  textTitle: z.string().default(""),
+  /** District header: e.g. "1 class period". */
+  timeFrame: z.string().default(""),
   standards: z.string(),
   agenda: z.string(),
   /** Academic / domain vocabulary list from the framework. */
@@ -244,6 +254,11 @@ export function emptyLessonPlanContent(
   return {
     version: 1,
     lessonDate: null,
+    subject: "",
+    gradeLabel: "",
+    teacherLine: "",
+    textTitle: "",
+    timeFrame: "",
     standards: "",
     agenda: "",
     vocabulary: "",

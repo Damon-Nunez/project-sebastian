@@ -4,6 +4,7 @@ import { LessonPlanEditor } from "@/components/LessonPlanEditor";
 import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { lessonErrorMessage } from "@/lib/lessons/errors";
+import { withHeaderDefaults } from "@/lib/lessons/headerDefaults";
 import { signLessonPlanImages } from "@/lib/lessons/images";
 import { parseOptionalRoutines } from "@/lib/lessons/optionalRoutines";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
@@ -38,7 +39,11 @@ export default async function LessonDetailPage({
   }
 
   const isFinished = plan.status === "final";
-  const content = parseLessonPlanContent(plan.content);
+  // Prefill empty header chrome from teacher profile (does not overwrite edits).
+  const content = withHeaderDefaults(
+    parseLessonPlanContent(plan.content),
+    teacher,
+  );
   const sectionGroups = parseSectionGroups(plan.section_groups);
   const optionalRoutines = parseOptionalRoutines(plan.optional_routines);
   const [imageUrls, periods] = await Promise.all([

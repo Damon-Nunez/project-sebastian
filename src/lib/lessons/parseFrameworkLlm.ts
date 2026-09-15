@@ -28,6 +28,7 @@ Rules:
 - learningTargets: the "I can…" targets only.
 - materials: materials lists if present; otherwise "".
 - standardsCodes: codes only (e.g. 8R6, RL.8.1, RST3). No prose descriptions.
+- textTitle: the core anchor text / book title from the framework header when present (e.g. "Summer of the Mariposas"). Do NOT put module/unit/lesson numbers here. If unknown, "".
 - workTimes: one object per Work Time block (A, B, C…). Include short title, minutes from the agenda, AND:
   - title = short topic only (e.g. "Language Dive: …"). Do NOT repeat "Work Time A" / "Work Time B" in the title — the app adds that prefix.
   - body = FULL instructional extract for that Work Time (the long source text). Do not put the condensed version in body.
