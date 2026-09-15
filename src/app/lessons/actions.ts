@@ -22,6 +22,7 @@ import { uploadLessonPlanDocxToDrive } from "@/lib/lessons/driveUpload";
 import { polishAndSaveLessonPlan } from "@/lib/lessons/polishAndSaveLessonPlan";
 import { parseOptionalRoutines } from "@/lib/lessons/optionalRoutines";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
+import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
 import {
   isAllowedLessonImageMime,
   MAX_LESSON_IMAGE_BYTES,
@@ -265,9 +266,12 @@ export async function finalizeLessonPlanAction(formData: FormData) {
   // Soft-fail: local FINISHED already succeeded; Drive is best-effort.
   let driveStatus: "ok" | "failed" = "failed";
   try {
+    const periods = await listPeriodsWithRostersForTeacher(teacher.id);
     const file = await buildLessonPlanExport({
       content,
       labels: { moduleLabel, unitLabel, lessonLabel },
+      sectionGroups: sectionGroups ?? parseSectionGroups({}),
+      periods,
     });
     const uploaded = await uploadLessonPlanDocxToDrive({
       teacherId: teacher.id,

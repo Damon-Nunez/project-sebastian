@@ -4,8 +4,11 @@ import {
   formatLessonPlanExportFilename,
   type LessonPlanExportLabels,
 } from "./documentModel";
+import { buildExportGroupingsTable } from "./groupingsModel";
 import { hydrateExportDocument } from "./hydrateAssets";
 import type { LessonPlanContent } from "../content";
+import type { SectionGroupsMap } from "../sectionGroups";
+import type { PeriodWithRoster } from "@/lib/roster/periods";
 
 export type BuiltLessonExport = {
   filename: string;
@@ -20,9 +23,17 @@ const DOCX_MIME =
 export async function buildLessonPlanExport(input: {
   content: LessonPlanContent;
   labels?: LessonPlanExportLabels;
+  sectionGroups?: SectionGroupsMap;
+  periods?: PeriodWithRoster[];
 }): Promise<BuiltLessonExport> {
   const labels = input.labels ?? {};
-  const skeleton = buildLessonPlanExportDocument(input.content, labels);
+  const groupings = buildExportGroupingsTable(
+    input.periods ?? [],
+    input.sectionGroups ?? {},
+  );
+  const skeleton = buildLessonPlanExportDocument(input.content, labels, {
+    groupings,
+  });
   const document = await hydrateExportDocument(skeleton);
   const bytes = await buildLessonPlanDocx(document);
 

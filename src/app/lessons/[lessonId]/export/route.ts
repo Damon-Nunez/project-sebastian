@@ -7,6 +7,8 @@ import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { buildLessonPlanExport } from "@/lib/lessons/export";
 import { withHeaderDefaults } from "@/lib/lessons/headerDefaults";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
+import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
+import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
 
 type RouteContext = {
   params: Promise<{ lessonId: string }>;
@@ -46,6 +48,8 @@ export async function GET(request: Request, context: RouteContext) {
     parseLessonPlanContent(plan.content),
     teacher,
   );
+  const sectionGroups = parseSectionGroups(plan.section_groups);
+  const periods = await listPeriodsWithRostersForTeacher(teacher.id);
   const file = await buildLessonPlanExport({
     content,
     labels: {
@@ -53,6 +57,8 @@ export async function GET(request: Request, context: RouteContext) {
       unitLabel: plan.unit_label,
       lessonLabel: plan.lesson_label,
     },
+    sectionGroups,
+    periods,
   });
 
   return new NextResponse(new Uint8Array(file.bytes), {

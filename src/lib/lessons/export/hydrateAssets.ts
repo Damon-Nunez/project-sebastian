@@ -151,6 +151,7 @@ export async function hydrateExportDocument(
     title: doc.title,
     subtitle: doc.subtitle,
     header: doc.header,
+    groupings: doc.groupings,
     sections,
   };
 }

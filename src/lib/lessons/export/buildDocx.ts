@@ -19,6 +19,7 @@ import {
   splitBodyLines,
 } from "./exportTheme";
 import type { LessonPlanExportHeader } from "./documentModel";
+import type { ExportGroupingsTable } from "./groupingsModel";
 import type { HydratedLessonPlanExportDocument } from "./hydrateAssets";
 import {
   fitImageSize,
@@ -26,6 +27,9 @@ import {
   readPngSize,
   sniffImageKind,
 } from "./imageSizing";
+
+/** ~6.5" content width for US Letter with ~1" margins (DXA / twips). */
+const TABLE_WIDTH_DXA = 9360;
 
 function headerCellParagraphs(lines: { bold?: string; text?: string }[]): Paragraph[] {
   if (lines.length === 0) {
@@ -68,8 +72,6 @@ function headerCellParagraphs(lines: { bold?: string; text?: string }[]): Paragr
 
 function headerTable(header: LessonPlanExportHeader): Table {
   // docx percentage widths often collapse in Word/Google Docs — use DXA (twips).
-  // ~6.5" content width for US Letter with ~1" margins.
-  const TABLE_WIDTH_DXA = 9360;
   const CELL_WIDTH_DXA = TABLE_WIDTH_DXA / 2;
 
   const border = {
@@ -131,6 +133,72 @@ function headerTable(header: LessonPlanExportHeader): Table {
         children: [cell(bottomLeft), cell(bottomRight)],
       }),
     ],
+  });
+}
+
+function groupingsTable(groupings: ExportGroupingsTable): Table {
+  const colCount = 1 + groupings.columnKeys.length;
+  const colWidth = Math.floor(TABLE_WIDTH_DXA / colCount);
+  const columnWidths = Array.from({ length: colCount }, () => colWidth);
+  const tableWidth = colWidth * colCount;
+
+  const border = {
+    style: BorderStyle.SINGLE,
+    size: 8,
+    color: "000000",
+  };
+  const borders = {
+    top: border,
+    bottom: border,
+    left: border,
+    right: border,
+  };
+
+  const textCell = (text: string, opts?: { bold?: boolean; header?: boolean }) =>
+    new TableCell({
+      borders,
+      width: { size: colWidth, type: WidthType.DXA },
+      children: text.split("\n").map(
+        (line, index, lines) =>
+          new Paragraph({
+            spacing: { after: index === lines.length - 1 ? 0 : 40 },
+            children: [
+              new TextRun({
+                text: line.length > 0 ? line : " ",
+                bold: opts?.bold ?? false,
+                size: opts?.header
+                  ? EXPORT_THEME_DOCX.captionSize
+                  : EXPORT_THEME_DOCX.bodySize,
+                color: EXPORT_COLORS.textHex,
+              }),
+            ],
+          }),
+      ),
+    });
+
+  const headerRow = new TableRow({
+    children: [
+      textCell("Class", { bold: true, header: true }),
+      ...groupings.columnKeys.map((key) =>
+        textCell(`Group ${key}`, { bold: true, header: true }),
+      ),
+    ],
+  });
+
+  const bodyRows = groupings.rows.map(
+    (row) =>
+      new TableRow({
+        children: [
+          textCell(row.periodName, { bold: true }),
+          ...row.cells.map((cell) => textCell(cell)),
+        ],
+      }),
+  );
+
+  return new Table({
+    width: { size: tableWidth, type: WidthType.DXA },
+    columnWidths,
+    rows: [headerRow, ...bodyRows],
   });
 }
 function paragraphsFromBody(body: string): Paragraph[] {
@@ -365,6 +433,27 @@ export async function buildLessonPlanDocx(
       ...paragraphsFromBody(section.body),
       ...attachmentParagraphs(section),
     );
+  }
+
+  if (doc.groupings) {
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        spacing: {
+          before: EXPORT_THEME_DOCX.beforeSection,
+          after: EXPORT_THEME_DOCX.afterSection,
+        },
+        children: [
+          new TextRun({
+            text: "Groupings",
+            bold: true,
+            size: EXPORT_THEME_DOCX.sectionHeadingSize,
+            color: EXPORT_COLORS.headingHex,
+          }),
+        ],
+      }),
+    );
+    children.push(groupingsTable(doc.groupings));
   }
 
   const document = new Document({

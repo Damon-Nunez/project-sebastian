@@ -7,7 +7,8 @@ import {
   STANDARD_CLASSWORK_RUBRIC,
   STANDARD_CLASSWORK_RUBRIC_IMAGE,
 } from "../standardRubric";
-
+import type { ExportGroupingsTable } from "./groupingsModel";
+export type { ExportGroupingsTable } from "./groupingsModel";
 export type ExportLink = {
   title: string;
   url: string;
@@ -38,6 +39,8 @@ export type LessonPlanExportDocument = {
   subtitle: string | null;
   /** District-style header chrome (2×2 cells). */
   header: LessonPlanExportHeader | null;
+  /** Optional Class × Group matrix for the finished plan. */
+  groupings: ExportGroupingsTable | null;
   sections: ExportSection[];
 };
 
@@ -168,16 +171,6 @@ function learningTargetsBody(content: LessonPlanContent): string {
   return trimOrEmpty(block?.body ?? "");
 }
 
-function formatStandardsAndTargetsBody(
-  standards: string,
-  targets: string,
-): string {
-  const codes = trimOrEmpty(standards);
-  const learningTargets = trimOrEmpty(targets);
-  if (codes && learningTargets) return `${codes}\n\n${learningTargets}`;
-  return codes || learningTargets;
-}
-
 function standardRubricImageRef(): ExportImageRef {
   return {
     id: STANDARD_CLASSWORK_RUBRIC_IMAGE.id,
@@ -196,6 +189,7 @@ function standardRubricImageRef(): ExportImageRef {
 export function buildLessonPlanExportDocument(
   content: LessonPlanContent,
   labels: LessonPlanExportLabels = {},
+  options: { groupings?: ExportGroupingsTable | null } = {},
 ): LessonPlanExportDocument {
   const title = formatLessonPlanExportTitle(labels);
   const subtitle = content.lessonDate
@@ -235,15 +229,20 @@ export function buildLessonPlanExportDocument(
       }
     : null;
 
+  const groupings = options.groupings ?? null;
+
   const sections: ExportSection[] = [];
 
   pushSection(
     sections,
-    "Standards / Learning targets",
-    formatStandardsAndTargetsBody(
-      content.standards,
-      learningTargetsBody(content),
-    ),
+    "Standards",
+    content.standards,
+    attachmentsForSection(content, "standards"),
+  );
+  pushSection(
+    sections,
+    "Learning Targets",
+    learningTargetsBody(content),
     attachmentsForSection(content, "learningTargets"),
   );
   pushSection(
@@ -298,7 +297,7 @@ export function buildLessonPlanExportDocument(
   );
 
   for (const [index, block] of content.extras.entries()) {
-    // Already merged into "Standards / Learning targets" above.
+    // Already exported as its own "Learning Targets" section above.
     if (isLearningTargetsExtra(block.label)) continue;
     pushSection(
       sections,
@@ -308,6 +307,7 @@ export function buildLessonPlanExportDocument(
   }
 
   const nestedKeys = new Set([
+    "standards",
     "learningTargets",
     "agenda",
     "vocabulary",
@@ -348,5 +348,5 @@ export function buildLessonPlanExportDocument(
     images: orphanImages,
   });
 
-  return { title, subtitle, header, sections };
+  return { title, subtitle, header, groupings, sections };
 }
