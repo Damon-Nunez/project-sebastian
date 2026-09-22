@@ -59,6 +59,10 @@ export type RubricRow = {
   teacher_id: string;
   kind: RubricKind;
   name: string | null;
+  /**
+   * Hybrid rubric grid (levels × categories × cell descriptors).
+   * Validate with rubricCriteriaSchema in `@/lib/rubrics/criteria`.
+   */
   criteria: unknown;
   unit_id: string | null;
   section_id: string | null;

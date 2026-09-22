@@ -12,7 +12,8 @@ export default function Home() {
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
           You are signed in. Open Lessons to upload a district framework and
-          edit a pre-filled draft, or manage class periods and rosters.
+          edit a pre-filled draft, manage class periods, or set up curriculum
+          units for grading rubrics.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -26,6 +27,12 @@ export default function Home() {
             className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
           >
             Set up periods
+          </Link>
+          <Link
+            href="/rubrics"
+            className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Grading assistant
           </Link>
         </div>
       </div>

@@ -7,8 +7,20 @@ import {
   updatePeriodAction,
   updateStudentAction,
 } from "@/app/periods/actions";
+import {
+  customizePeriodDailyRubricAction,
+  resetPeriodDailyRubricAction,
+} from "@/app/periods/rubricActions";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import {
+  getDailyWorkDefaults,
+  pickDailyWorkEditorSource,
+} from "@/lib/rubrics/defaults";
+import {
+  getSectionDailyOverrides,
+  sectionHasDailyOverride,
+} from "@/lib/rubrics/overrides";
 import { getPeriodForTeacher } from "@/lib/roster/periods";
 import { listStudentsForPeriod } from "@/lib/roster/students";
 
@@ -37,6 +49,15 @@ export default async function PeriodDetailPage({
     teacherId: teacher.id,
     periodId: period.id,
   });
+  const [dailyDefaults, sectionOverrides] = await Promise.all([
+    getDailyWorkDefaults(teacher.id),
+    getSectionDailyOverrides({
+      teacherId: teacher.id,
+      sectionId: period.id,
+    }),
+  ]);
+  const hasSharedDaily = pickDailyWorkEditorSource(dailyDefaults) != null;
+  const hasSectionOverride = sectionHasDailyOverride(sectionOverrides);
 
   return (
     <section className="space-y-6">
@@ -207,6 +228,62 @@ export default async function PeriodDetailPage({
                 Save period
               </button>
             </form>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Daily work rubric
+            </h2>
+            {hasSectionOverride ? (
+              <>
+                <p className="mt-2 text-sm text-slate-600">
+                  This period uses a custom copy (not the shared default).
+                </p>
+                <Link
+                  href={`/periods/${period.id}/rubrics/daily`}
+                  className="mt-4 flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Edit period rubric
+                </Link>
+                <form action={resetPeriodDailyRubricAction} className="mt-2">
+                  <input type="hidden" name="periodId" value={period.id} />
+                  <ConfirmSubmitButton
+                    label="Use shared default again"
+                    confirmMessage={`Reset ${period.name} to the shared daily work rubric?`}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  />
+                </form>
+              </>
+            ) : hasSharedDaily ? (
+              <>
+                <p className="mt-2 text-sm text-slate-600">
+                  Using the shared daily work rubric. Customize only if this
+                  period needs different scoring.
+                </p>
+                <form action={customizePeriodDailyRubricAction} className="mt-4">
+                  <input type="hidden" name="periodId" value={period.id} />
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                  >
+                    Edit rubric for this period
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-slate-600">
+                  Set up the shared daily work rubric first, then you can
+                  override it per period.
+                </p>
+                <Link
+                  href="/rubrics/daily"
+                  className="mt-4 flex w-full items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                >
+                  Set up shared rubric
+                </Link>
+              </>
+            )}
           </div>
 
           <div className="rounded-xl border border-red-100 bg-white p-6 shadow-sm">
