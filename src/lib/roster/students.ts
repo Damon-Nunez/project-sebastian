@@ -27,6 +27,25 @@ export async function listStudentsForPeriod(input: {
   return (data ?? []) as StudentRow[];
 }
 
+export async function getStudentForTeacher(
+  teacherId: string,
+  studentId: string,
+): Promise<StudentRow | null> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("students")
+    .select(STUDENT_SELECT)
+    .eq("teacher_id", teacherId)
+    .eq("id", studentId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load student: ${error.message}`);
+  }
+
+  return (data as StudentRow | null) ?? null;
+}
+
 /** All students for a teacher across periods (ordered by name). */
 export async function listStudentsForTeacher(
   teacherId: string,

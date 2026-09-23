@@ -56,7 +56,13 @@ export async function AppShell({ children }: AppShellProps) {
                   href="/rubrics"
                   className="text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
-                  Grading assistant
+                  Rubrics
+                </Link>
+                <Link
+                  href="/grading"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                >
+                  Grading
                 </Link>
                 <Link
                   href="/lessons"

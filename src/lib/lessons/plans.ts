@@ -27,7 +27,7 @@ const PLAN_SELECT =
   "id, teacher_id, module_label, unit_label, lesson_label, content, section_groups, optional_routines, free_text_asks, status, drive_file_id, created_at, updated_at";
 
 const DOCUMENT_SELECT =
-  "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, created_at, updated_at";
+  "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, student_id, body_text, created_at, updated_at";
 
 const TEACHER_HEADER_SELECT =
   "id, subject, grade_label, honorific, display_name";

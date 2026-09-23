@@ -1,6 +1,6 @@
 /**
  * Hand-written row types for Ticket 2 domain schema.
- * Keep in sync with supabase/migrations/003–007.
+ * Keep in sync with supabase/migrations/003–007 (+ later grading/label migrations).
  */
 
 export type RubricKind = "hw" | "short_response" | "essay";
@@ -106,6 +106,10 @@ export type DocumentRow = {
   storage_path: string | null;
   lesson_plan_id: string | null;
   grading_session_id: string | null;
+  /** Roster student assigned to this student_work upload (migration 019). */
+  student_id: string | null;
+  /** Extracted / edited plain text (student_work). Null for framework docs. */
+  body_text: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -129,6 +133,10 @@ export type GradingSessionRow = {
   rubric_id: string;
   assignment_type: AssignmentType;
   title: string | null;
+  /** Assignment folder labels (migration 017) — local hierarchy under a period. */
+  module_label: string | null;
+  unit_label: string | null;
+  lesson_label: string | null;
   status: DraftFinalStatus;
   created_at: string;
   updated_at: string;

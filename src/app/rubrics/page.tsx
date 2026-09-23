@@ -41,12 +41,18 @@ export default async function RubricsPage() {
           Setup
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-          Grading assistant
+          Rubrics
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          Set up the scoring guides you reuse when grading. Copy from your own
-          sheets — nothing is hard-coded to one curriculum. Units for essay
-          rubrics live under Manage units below.
+          Set up the scoring guides you reuse when grading. Homework uploads
+          live under{" "}
+          <Link
+            href="/grading"
+            className="font-medium text-slate-800 underline-offset-2 hover:underline"
+          >
+            Grading
+          </Link>
+          , organized by class and folders like M1U1L1-HW.
         </p>
       </div>
 

@@ -11,9 +11,8 @@ export default function Home() {
           Teacher workload assistant
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          You are signed in. Open Lessons to upload a district framework and
-          edit a pre-filled draft, manage class periods, or set up curriculum
-          units for grading rubrics.
+          You are signed in. Open Lessons to upload a district framework, manage
+          periods, grade homework under class folders, or set up rubrics.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -21,6 +20,12 @@ export default function Home() {
             className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
             Open lessons
+          </Link>
+          <Link
+            href="/grading"
+            className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Open grading
           </Link>
           <Link
             href="/periods"
@@ -32,7 +37,7 @@ export default function Home() {
             href="/rubrics"
             className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
           >
-            Grading assistant
+            Rubrics
           </Link>
         </div>
       </div>
