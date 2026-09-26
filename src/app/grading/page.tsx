@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { HomeworkUploadForm } from "@/components/HomeworkUploadForm";
 import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { listAssignmentsForTeacher } from "@/lib/grading/assignments";
 import { gradingErrorMessage } from "@/lib/grading/errors";
+import { formatAssignmentFolderTitle } from "@/lib/grading/labels";
+import { referenceKindLabel } from "@/lib/grading/reference";
 import { listPeriodsForTeacher } from "@/lib/roster/periods";
 
 type GradingPageProps = {
@@ -10,8 +13,11 @@ type GradingPageProps = {
 
 export default async function GradingPage({ searchParams }: GradingPageProps) {
   const teacher = await getCurrentTeacher();
-  const periods = await listPeriodsForTeacher(teacher.id);
-  const { error } = await searchParams;
+  const [periods, assignments, { error }] = await Promise.all([
+    listPeriodsForTeacher(teacher.id),
+    listAssignmentsForTeacher(teacher.id),
+    searchParams,
+  ]);
   const errorMessage = gradingErrorMessage(error);
 
   return (
@@ -47,6 +53,56 @@ export default async function GradingPage({ searchParams }: GradingPageProps) {
           {errorMessage}
         </p>
       ) : null}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Assignments</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              One per M/U/L — the answer key is shared by every period.
+            </p>
+          </div>
+          <Link
+            href="/grading/assignments/new"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            New assignment
+          </Link>
+        </div>
+        {assignments.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-600">No assignments yet.</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-slate-100">
+            {assignments.map((assignment) => (
+              <li key={assignment.id}>
+                <Link
+                  href={`/grading/assignments/${assignment.id}`}
+                  className="flex items-center justify-between gap-4 py-3 text-sm transition hover:bg-slate-50"
+                >
+                  <span className="font-medium text-slate-900">
+                    {formatAssignmentFolderTitle(
+                      assignment,
+                      null,
+                      assignment.assignment_type,
+                    )}
+                  </span>
+                  <span
+                    className={
+                      assignment.reference_updated_at === null
+                        ? "text-amber-700"
+                        : "text-slate-500"
+                    }
+                  >
+                    {assignment.reference_updated_at === null
+                      ? "Needs answer key"
+                      : referenceKindLabel(assignment.reference_kind)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

@@ -110,6 +110,8 @@ export type DocumentRow = {
   student_id: string | null;
   /** Extracted / edited plain text (student_work). Null for framework docs. */
   body_text: string | null;
+  /** Photo / scanned PDF with empty or sparse text — grade from the stored image (migration 020). */
+  needs_vision: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -137,7 +139,30 @@ export type GradingSessionRow = {
   module_label: string | null;
   unit_label: string | null;
   lesson_label: string | null;
+  /** Teacher-level assignment (migration 021). Null for legacy title-only folders. */
+  assignment_id: string | null;
   status: DraftFinalStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReferenceKind = "answer_key" | "exemplar" | "none";
+
+export type AssignmentRow = {
+  id: string;
+  teacher_id: string;
+  assignment_type: AssignmentType;
+  module_label: string | null;
+  unit_label: string | null;
+  lesson_label: string | null;
+  /** Essay rubric unit. */
+  unit_id: string | null;
+  reference_kind: ReferenceKind;
+  /** Exemplars may contain student PII — sanitize before any AI call. */
+  reference_text: string | null;
+  reference_filename: string | null;
+  reference_storage_path: string | null;
+  reference_updated_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -169,6 +194,7 @@ export const DOMAIN_TABLES = [
   "lesson_plans",
   "documents",
   "lesson_worksheets",
+  "assignments",
   "grading_sessions",
   "grading_suggestions",
 ] as const;

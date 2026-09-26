@@ -21,9 +21,11 @@ import { headerTextForMatch } from "@/lib/grading/headerText";
 import { matchHomeworkToRoster } from "@/lib/grading/matchHomework";
 import {
   assignStudentToStudentWork,
-  createStudentWorkFromUpload,
+  createStudentWorkUploadTarget,
   EmptyHomeworkTextError,
+  finalizeStudentWorkUpload,
   getStudentWorkForTeacher,
+  HomeworkTooLargeError,
   MAX_HOMEWORK_BYTES,
   UnsupportedHomeworkFormatError,
 } from "@/lib/grading/upload";
@@ -46,27 +48,63 @@ function parseAssignmentType(raw: string): AssignmentType {
   return "hw";
 }
 
-export async function uploadHomeworkAction(formData: FormData) {
+type HomeworkUploadFailure = { ok: false; code: GradingErrorCode };
+
+function homeworkUploadErrorCode(error: unknown): GradingErrorCode {
+  if (error instanceof UnsupportedHomeworkFormatError) return "invalid_format";
+  if (error instanceof EmptyHomeworkTextError) return "empty_text";
+  if (error instanceof HomeworkTooLargeError) return "file_too_large";
+  return "upload_failed";
+}
+
+/** Step 1: sign a one-time Storage upload so file bytes skip the Vercel body limit. */
+export async function requestHomeworkUploadAction(input: {
+  filename: string;
+  size: number;
+}): Promise<
+  { ok: true; storagePath: string; token: string } | HomeworkUploadFailure
+> {
   const teacher = await getCurrentTeacher();
-  const file = formData.get("file");
+  const filename = typeof input?.filename === "string" ? input.filename : "";
+  const size = typeof input?.size === "number" ? input.size : 0;
 
-  if (!(file instanceof File) || file.size === 0) {
-    redirect(gradingErrorRedirect("/grading", "missing_file"));
+  if (!filename || size <= 0) return { ok: false, code: "missing_file" };
+  if (size > MAX_HOMEWORK_BYTES) return { ok: false, code: "file_too_large" };
+
+  try {
+    const target = await createStudentWorkUploadTarget({
+      teacherId: teacher.id,
+      filename,
+      size,
+    });
+    return { ok: true, ...target };
+  } catch (error) {
+    console.error("requestHomeworkUploadAction failed", error);
+    return { ok: false, code: homeworkUploadErrorCode(error) };
   }
+}
 
-  if (file.size > MAX_HOMEWORK_BYTES) {
-    redirect(gradingErrorRedirect("/grading", "file_too_large"));
-  }
+/** Step 2: turn the stored file into a student_work row and auto-match the student. */
+export async function finalizeHomeworkUploadAction(input: {
+  storagePath: string;
+  filename: string;
+}): Promise<{ ok: true; documentId: string } | HomeworkUploadFailure> {
+  const teacher = await getCurrentTeacher();
+  const storagePath =
+    typeof input?.storagePath === "string" ? input.storagePath : "";
+  const filename =
+    typeof input?.filename === "string" && input.filename
+      ? input.filename
+      : "homework";
 
-  const filename = file.name || "homework.bin";
-  const bytes = Buffer.from(await file.arrayBuffer());
+  if (!storagePath) return { ok: false, code: "missing_file" };
 
   let documentId: string;
   try {
-    const { document } = await createStudentWorkFromUpload({
+    const { document } = await finalizeStudentWorkUpload({
       teacherId: teacher.id,
+      storagePath,
       filename,
-      bytes,
     });
     documentId = document.id;
 
@@ -83,18 +121,12 @@ export async function uploadHomeworkAction(formData: FormData) {
       });
     }
   } catch (error) {
-    if (error instanceof UnsupportedHomeworkFormatError) {
-      redirect(gradingErrorRedirect("/grading", "invalid_format"));
-    }
-    if (error instanceof EmptyHomeworkTextError) {
-      redirect(gradingErrorRedirect("/grading", "empty_text"));
-    }
-    console.error("uploadHomeworkAction failed", error);
-    redirect(gradingErrorRedirect("/grading", "upload_failed"));
+    console.error("finalizeHomeworkUploadAction failed", error);
+    return { ok: false, code: homeworkUploadErrorCode(error) };
   }
 
   revalidatePath("/grading");
-  redirect(`/grading/work/${documentId}`);
+  return { ok: true, documentId };
 }
 
 export async function assignHomeworkStudentAction(formData: FormData) {

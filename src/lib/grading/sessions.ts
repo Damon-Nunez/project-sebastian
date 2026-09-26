@@ -9,12 +9,14 @@ import {
   normalizeAssignmentFolderLabels,
   type AssignmentFolderLabels,
 } from "@/lib/grading/labels";
+import { findOrCreateAssignment } from "@/lib/grading/assignments";
+import { deleteStoredStudentWorkFiles } from "@/lib/grading/upload";
 import { normalizeOptionalText } from "@/lib/roster/validate";
 import { resolveRubric } from "@/lib/rubrics/resolve";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const SESSION_SELECT =
-  "id, teacher_id, section_id, rubric_id, assignment_type, title, module_label, unit_label, lesson_label, status, created_at, updated_at";
+  "id, teacher_id, section_id, rubric_id, assignment_type, title, module_label, unit_label, lesson_label, assignment_id, status, created_at, updated_at";
 
 export type CreateAssignmentFolderInput = {
   teacherId: string;
@@ -96,6 +98,28 @@ async function findExistingAssignmentFolder(input: {
   return match ?? null;
 }
 
+async function linkSessionToAssignment(input: {
+  teacherId: string;
+  sessionId: string;
+  assignmentId: string;
+}): Promise<GradingSessionRow> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("grading_sessions")
+    .update({ assignment_id: input.assignmentId })
+    .eq("teacher_id", input.teacherId)
+    .eq("id", input.sessionId)
+    .select(SESSION_SELECT)
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      `Failed to link folder to assignment: ${error?.message ?? "unknown error"}`,
+    );
+  }
+  return asSessionRow(data as Record<string, unknown>);
+}
+
 /**
  * Find an existing local assignment folder for this period + type + M/U/L,
  * or create one. Resolves rubric from teacher defaults / section override.
@@ -116,6 +140,17 @@ export async function findOrCreateAssignmentFolder(
     );
   }
 
+  const assignment = hasAssignmentFolderPath(labels)
+    ? (
+        await findOrCreateAssignment({
+          teacherId: input.teacherId,
+          assignmentType: input.assignmentType,
+          labels,
+          unitId: input.unitId,
+        })
+      ).assignment
+    : null;
+
   const existing = await findExistingAssignmentFolder({
     teacherId: input.teacherId,
     sectionId: input.sectionId,
@@ -124,6 +159,16 @@ export async function findOrCreateAssignmentFolder(
   });
 
   if (existing) {
+    if (assignment && existing.assignment_id !== assignment.id) {
+      return {
+        session: await linkSessionToAssignment({
+          teacherId: input.teacherId,
+          sessionId: existing.id,
+          assignmentId: assignment.id,
+        }),
+        created: false,
+      };
+    }
     return { session: existing, created: false };
   }
 
@@ -159,6 +204,7 @@ export async function findOrCreateAssignmentFolder(
       module_label: labels.module_label,
       unit_label: labels.unit_label,
       lesson_label: labels.lesson_label,
+      assignment_id: assignment?.id ?? null,
       status: "draft",
       updated_at: now,
     })
@@ -203,16 +249,21 @@ export async function deleteGradingSessionForTeacher(input: {
 
   const admin = createAdminSupabaseClient();
 
-  const { error: docsError } = await admin
+  const { data: deletedDocs, error: docsError } = await admin
     .from("documents")
     .delete()
     .eq("teacher_id", input.teacherId)
     .eq("grading_session_id", input.sessionId)
-    .eq("kind", "student_work");
+    .eq("kind", "student_work")
+    .select("storage_path");
 
   if (docsError) {
     throw new Error(`Failed to delete homework in folder: ${docsError.message}`);
   }
+
+  await deleteStoredStudentWorkFiles(
+    (deletedDocs ?? []).map((doc) => doc.storage_path as string | null),
+  );
 
   const { data, error } = await admin
     .from("grading_sessions")

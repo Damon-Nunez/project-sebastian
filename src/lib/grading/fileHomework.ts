@@ -16,7 +16,7 @@ const SUGGESTION_SELECT =
   "id, teacher_id, grading_session_id, student_id, document_id, suggested_range_low, suggested_range_high, suggested_comment, accommodation_flagged, teacher_grade, teacher_comment, status, created_at, updated_at";
 
 const DOCUMENT_SELECT =
-  "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, student_id, body_text, created_at, updated_at";
+  "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, student_id, body_text, needs_vision, created_at, updated_at";
 
 export type FileHomeworkResult = {
   session: GradingSessionRow;

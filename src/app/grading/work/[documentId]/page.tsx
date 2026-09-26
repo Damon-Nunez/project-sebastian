@@ -6,7 +6,10 @@ import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
 import { gradingErrorMessage } from "@/lib/grading/errors";
 import { headerTextForMatch } from "@/lib/grading/headerText";
 import { matchHomeworkToRoster } from "@/lib/grading/matchHomework";
-import { getStudentWorkForTeacher } from "@/lib/grading/upload";
+import {
+  createSignedStudentWorkUrl,
+  getStudentWorkForTeacher,
+} from "@/lib/grading/upload";
 import { resolveLessonLabels } from "@/lib/lessons/labels";
 import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periods";
 
@@ -32,6 +35,11 @@ export default async function HomeworkWorkPage({
   ]);
 
   if (!document) notFound();
+
+  const originalUrl = document.storage_path
+    ? await createSignedStudentWorkUrl(document.storage_path)
+    : null;
+  const isPhoto = document.storage_path?.toLowerCase().endsWith(".jpg") ?? false;
 
   const match = matchHomeworkToRoster(periods, {
     filename: document.original_filename,
@@ -70,7 +78,33 @@ export default async function HomeworkWorkPage({
           <span className="font-medium text-slate-800">
             {document.original_filename ?? "uploaded file"}
           </span>
+          {originalUrl && !isPhoto ? (
+            <>
+              {" · "}
+              <a
+                href={originalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-slate-800 underline-offset-2 hover:underline"
+              >
+                Open original
+              </a>
+            </>
+          ) : null}
         </p>
+        {document.needs_vision ? (
+          <p className="mt-2 text-sm text-amber-700">
+            No readable text in this file — it will be graded from the image.
+          </p>
+        ) : null}
+        {originalUrl && isPhoto ? (
+          // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
+          <img
+            src={originalUrl}
+            alt="Uploaded homework"
+            className="mt-4 max-h-[32rem] rounded-lg border border-slate-200"
+          />
+        ) : null}
       </div>
 
       {errorMessage ? (

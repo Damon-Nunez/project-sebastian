@@ -157,12 +157,50 @@ Shared infrastructure every teacher and every AI feature depends on.
 - Auto-match student + section from roster locally
 - **Fallback (decided)**: manual selection via class dropdown + student name when auto-match fails or is ambiguous
 
-### Ticket 10: AI grading — range + feedback
-- **Teacher selects assignment type via dropdown** (HW / short-response / unit essay) — drives logging + which rubric applies
-- Suggested **grade range** (4–5 pt spread) + rubric-grounded comments
+### Ticket 10: AI grading — answer key, sorting, range + feedback
+
+**Scope: English only for MVP.** Other subjects need major adjustments — see **Feature concerns — multi-subject grading** (not ticketed).
+
+**Flow**: Teacher creates assignment + uploads answer key → batch-uploads student work → app sorts locally (student + assignment) → teacher confirms → AI grades (text first, masked image fallback) → range + comment.
+
+#### 10.1 Original file storage + upload types
+- Store original upload bytes in a **private** Supabase storage bucket (`documents.storage_path`) — needed for vision fallback
+- Accept **photos** (`.jpg` / `.png` / `.heic`) in addition to `.docx` / `.pdf`
+- Scanned / photo PDFs with no text layer are **accepted** and marked "needs vision" (today they're rejected as empty)
+
+#### 10.2 Assignment + answer key (source of truth)
+- **Answer key expected per assignment** — upload strongly prompted on "New assignment"
+- Reference kind: **answer key** (correctness) / **exemplar** (quality compare) / **none** (rubric only)
+- Shared across periods: keyed by teacher + assignment type + Module/Unit/Lesson (same key as period folders), so every period's `M1U1L3-HW` uses one key
+- No reference → grading still runs on rubric alone, with a visible **"No answer key — graded on rubric only"** badge
+- Key + rubric contain no PII → cacheable across the batch (prompt caching)
+
+#### 10.3 Batch upload + local sorting (no AI)
+- Teacher **picks the assignment first** (or creates it + uploads the key), then drops the whole batch
+- Per file, locally:
+  - **Student** → existing roster matcher (filename / header); student's period picks the period folder
+  - **Assignment check** → text overlap vs. the answer key's question text; low overlap is flagged instead of filed
+- Review list: clean matches pre-selected → **"Confirm all"**; problem files go to **Unsorted** with a reason + manual dropdowns
+- **Never auto-create folders** without a teacher click
+- Stretch: guess the assignment from text overlap alone (skip the picker)
+
+#### 10.4 AI grading — text path (default)
+- Payload: resolved rubric (with period override) + reference + reference kind + assignment type + **sanitized** student work + **sanitized** student notes
+- **Scale: 0–100%** (universal)
+  - With key → per-item right/wrong → correctness % (e.g. 8/10 = 80%), adjusted by rubric for quality
+  - Without key → rubric criterion scores → converted to %
+- Output: per-criterion scores + **grade range** (4–5 pt spread) + rubric-grounded comment + `accommodation_flagged`
+- AI shows its work (why 78–83%) so the teacher can trust or override
+- **Visible flag** when accommodation notes were considered — teacher decides final interpretation
 - Calibrated against Phase 0 samples (content vs. mechanics)
-- **Visible flag** when student accommodation notes were considered — teacher decides final interpretation
-- Sanitized payloads only
+
+#### 10.5 AI grading — vision fallback (ship after 10.1–10.4)
+- Triggered when extracted text is empty/sparse (scan, photo) **or** teacher marks the assignment "worksheet / visual layout"
+- Before any call, locally: render pages → OCR → **black out roster-name matches** → always blank a **header strip** on page 1
+- Teacher sees a **masked preview** ("this is what the AI will see") before grading
+- Known limit: local OCR is weak on handwriting — header strip + teacher preview are the real guard for handwritten names
+
+**Privacy**: Sanitized text / masked images only — no raw student PII in any AI payload (decision #8).
 
 ### Ticket 11: Review, export & class summary
 - Edit grade + comments before marking final in app
@@ -205,7 +243,8 @@ Shared infrastructure every teacher and every AI feature depends on.
 | Accommodation visibility in grading UI | **In scope** — Ticket 10 |
 | Ambiguous student-match fallback | **Resolved** — manual class + student picker |
 | Assignment type / rubric selection | **Resolved** — teacher dropdown per upload/batch |
-| Supported file types for upload | **Resolved** — V1 `.docx` + `.pdf` |
+| Supported file types for upload | **Resolved** — V1 `.docx` + `.pdf`; student work also photos + scanned PDFs (Ticket 10) |
+| Grading source of truth | **Resolved** — per-assignment answer key shared across periods; rubric-only fallback (Ticket 10) |
 | AI provider + hosting | **Resolved** — Option B + Sonnet + Supabase (see Architecture stack) |
 
 ---
@@ -220,7 +259,7 @@ Shared infrastructure every teacher and every AI feature depends on.
 | 4 | Rubric / assignment type | **Teacher dropdown** (HW / short-response / essay) — drives logging + rubric |
 | 5 | AI provider + hosting | **Option B** — Vercel + Supabase + Claude Sonnet; you pay MVP, teacher pays later |
 | 6 | Timeline / scope cuts | **No cuts** — full MVP scope; first month of lesson plans already done |
-| 7 | V1 file types | **Upload `.docx` + `.pdf`**. Google Doc = export to those first. Export: Drive + downloadable `.docx`/`.pdf` |
+| 7 | V1 file types | **Upload `.docx` + `.pdf`**. Google Doc = export to those first. **Student work also accepts photos (`.jpg`/`.png`/`.heic`) and scanned PDFs** (Ticket 10 vision fallback). Export: Drive + downloadable `.docx`/`.pdf` |
 | 8 | Privacy / Phase 0 samples | Real student PII stays local. Sanitizer runs before every AI call. Samples are calibration, not the only supported layout |
 | 9 | Framework flavors | Support both verbose Kiddom/EL exports **and** the simpler unpacking / filled-in skeleton |
 | 10 | Phase 0 remaining samples | **Deferred**: essay rubric + graded work wait for Phase 1B; report card codes wait for Phase 3. Lesson planning is the priority. |
@@ -229,11 +268,29 @@ Shared infrastructure every teacher and every AI feature depends on.
 
 ## Open questions (remaining)
 
-- **Grade scale** *(Phase 1B)*: Embedded HW rubric is **1–4**, while Jupiter grading in scope is **0–100 ranges**.
+- **Grade scale** *(Phase 1B)*: **Decided for now — 0–100%** (universal). Still to confirm with first user how she converts 1–4 rubric scores to % → likely a teacher-configurable mapping in rubric setup.
 - **Short-response rubric** *(Phase 1B)*: Same 4-point HW/classwork rubric, or a separate one?
 - **Essay rubrics** *(Phase 1B)*: Need the actual table, not just a lesson reference.
 - **Sanitizer edge cases**: **Locked (Ticket 3 V1)** — full roster name always; first/last only if unique on roster; no nickname dictionary; duplicate full names → lowest student id wins; doc match from filename/header is local (`matched` / `none` / `ambiguous`).
 - **Batch lesson prep**: One-at-a-time OK for MVP if each lesson is fast?
+
+---
+
+## Feature concerns — multi-subject grading (not ticketed)
+
+Ticket 10 is built **English-only**. Long-term plan: the site adapts to the **subject the teacher selects at sign-up**. These are known vulnerabilities to solve when other subject modes are built — not MVP work.
+
+**Already universal (no change expected)**: rubric grid (any levels × categories × descriptors, optional weights), free-text Module/Unit/Lesson folders, 0–100% scale, sanitizer, student matching.
+
+| Concern | Why it breaks outside English | Likely direction |
+|---|---|---|
+| **Assignment types** | HW / short-response / essay has no home for math problem sets, science lab reports, quizzes/tests, map/diagram tasks | Small fixed set of behavior types (e.g. HW/CW, short response, extended writing, quiz/test) + free-text assignment names; enum migration since type = rubric kind |
+| **Answer key = one blob, equal weight** | "8/10 = 80%" fails with per-question point values, partial credit (right method, arithmetic slip), equivalent answers (½ = 0.5, `x = 3` = `3 = x`), units/sig figs, mixed exact + open-ended items | AI parses key into **structured items** (points, exact vs. open, partial credit allowed); teacher reviews once per assignment; app sums points deterministically |
+| **Vision is "fallback"** | Math is handwritten notation + shown work; equation editors export badly even from typed docs. Science = diagrams, graphs, data tables. Social Studies = maps | Subject-driven default: "visual" assignments by default for math/science; text-first stays for English |
+| **OCR name masking** | Local OCR can't read math notation — name detection on math photos is weak | Header strip + teacher masked preview are the real guard; consider stronger masking before non-English launch |
+| **Text-overlap sorting** | Work done on blank paper has no question text to match against the key | Lands in Unsorted; "pick assignment first" remains the primary sort path |
+| **Grading prompt rules** | Without subject rules, AI grades math like English (docks spelling on a proof, ignores method) | Subject-specific prompt rules from teacher profile `subject` (accept equivalent forms, check units, grade reasoning vs. final answer) |
+| **Sign-up subject → site** | Subject selection doesn't drive behavior yet (`teachers.subject` is only a lesson header default today) | Subject at sign-up drives assignment types, vision default, prompt rules, rubric templates |
 
 ---
 
