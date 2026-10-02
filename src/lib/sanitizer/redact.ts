@@ -11,6 +11,10 @@ export function tokenForStudentId(studentId: string): string {
   return `[[STU_${studentId}]]`;
 }
 
+/** Placeholder for a name part several students share; shown back as "[student]". */
+export const SHARED_NAME_TOKEN = "[[STU_SHARED]]";
+const SHARED_NAME_DISPLAY = "[student]";
+
 function splitName(fullName: string): { first: string; last: string | null } {
   const parts = normalizePersonName(fullName).split(" ").filter(Boolean);
   if (parts.length === 0) return { first: "", last: null };
@@ -26,6 +30,7 @@ function splitName(fullName: string): { first: string; last: string | null } {
  * - Nickname: only if unique among nicknames AND does not collide with another
  *   student's first/last (no invented dictionary)
  * - Duplicate full names: first student id (lexicographic) owns that alias
+ * Shared parts left out here are still redacted, to SHARED_NAME_TOKEN.
  */
 export function aliasesForRoster(roster: RosterStudent[]): Map<string, string[]> {
   const cleaned = roster
@@ -115,7 +120,20 @@ export function buildNameTokenMap(roster: RosterStudent[]): NameTokenMap {
     aliases: aliasById.get(row.id) ?? [row.name],
   }));
 
-  return { entries };
+  const owned = new Set(
+    entries.flatMap((entry) => entry.aliases.map((a) => a.toLowerCase())),
+  );
+  const shared = new Map<string, string>();
+  for (const row of cleaned) {
+    const { first, last } = splitName(row.name);
+    for (const part of [first, last, row.nickname]) {
+      if (part && !owned.has(part.toLowerCase())) {
+        shared.set(part.toLowerCase(), part);
+      }
+    }
+  }
+
+  return { entries, sharedAliases: [...shared.values()] };
 }
 
 type AliasHit = { alias: string; token: string; studentId: string };
@@ -156,7 +174,11 @@ function replacePlan(map: NameTokenMap): AliasHit[] {
 export function redact(text: string, map: NameTokenMap): string {
   let result = text;
 
-  for (const hit of replacePlan(map)) {
+  const plan = [
+    ...replacePlan(map),
+    ...map.sharedAliases.map((alias) => ({ alias, token: SHARED_NAME_TOKEN })),
+  ];
+  for (const hit of plan) {
     const body = aliasPatternBody(hit.alias);
     if (!body) continue;
 
@@ -183,7 +205,7 @@ export function rehydrate(text: string, map: NameTokenMap): string {
     result = result.split(entry.token).join(entry.name);
   }
 
-  return result;
+  return result.split(SHARED_NAME_TOKEN).join(SHARED_NAME_DISPLAY);
 }
 
 /** Convenience: build map + redact + verify. Prefer prepareTextForAi at call sites. */

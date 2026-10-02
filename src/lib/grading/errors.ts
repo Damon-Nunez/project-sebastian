@@ -1,7 +1,7 @@
+import { MAX_VISION_PAGES } from "./studentWorkFiles";
+
 export type GradingErrorCode =
-  | "period_not_found"
   | "session_not_found"
-  | "folder_path_required"
   | "rubric_missing"
   | "create_failed"
   | "missing_file"
@@ -9,10 +9,10 @@ export type GradingErrorCode =
   | "empty_text"
   | "file_too_large"
   | "upload_failed"
+  | "batch_too_large"
   | "document_not_found"
   | "student_required"
   | "student_not_found"
-  | "assign_failed"
   | "save_failed"
   | "delete_failed"
   | "assignment_not_found"
@@ -22,13 +22,15 @@ export type GradingErrorCode =
   | "reference_too_long"
   | "reference_file_invalid"
   | "reference_file_empty"
-  | "reference_failed";
+  | "reference_failed"
+  | "grading_failed"
+  | "approval_failed"
+  | "combine_too_few"
+  | "combine_too_many"
+  | "combine_failed";
 
 const MESSAGES: Record<GradingErrorCode, string> = {
-  period_not_found: "That period was not found.",
   session_not_found: "That assignment folder was not found.",
-  folder_path_required:
-    "Set Module, Unit, or Lesson (or a title) so this assignment has a folder path.",
   rubric_missing:
     "No matching rubric yet. Set up Daily work (or an essay rubric) under Rubrics first.",
   create_failed: "Could not create that assignment folder. Try again.",
@@ -38,10 +40,10 @@ const MESSAGES: Record<GradingErrorCode, string> = {
   empty_text: "That Word file has no text in it. Try another export.",
   file_too_large: "That file is too large (max 20MB).",
   upload_failed: "Upload failed. Please try again.",
+  batch_too_large: "That's too many files at once (max 60). Drop them in smaller groups.",
   document_not_found: "That homework upload could not be found.",
   student_required: "Pick a class and student before confirming.",
   student_not_found: "That student was not found on your roster.",
-  assign_failed: "Could not save that student match. Try again.",
   save_failed: "Could not save that homework into a folder. Try again.",
   delete_failed: "Could not delete that assignment. Try again.",
   assignment_not_found: "That assignment was not found.",
@@ -56,6 +58,11 @@ const MESSAGES: Record<GradingErrorCode, string> = {
   reference_file_empty:
     "No text found in that file. Paste the answer key text instead.",
   reference_failed: "Could not save the answer key. Try again.",
+  grading_failed: "Grading couldn't run. Try again.",
+  approval_failed: "Couldn't save that — it may already be approved. Refresh and try again.",
+  combine_too_few: "Check at least two photos to combine into one paper.",
+  combine_too_many: `A paper can have at most ${MAX_VISION_PAGES} pages.`,
+  combine_failed: "Couldn't combine those photos. Try again.",
 };
 
 export function gradingErrorMessage(

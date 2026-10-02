@@ -57,6 +57,18 @@ export default async function NewAssignmentPage({
         className="max-w-xl space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <label className="block space-y-1.5">
+          <span className={labelClass}>Name (optional)</span>
+          <input
+            name="title"
+            placeholder="Mango Ch1"
+            className={inputClass}
+          />
+        </label>
+        <p className="text-xs text-slate-500">
+          If you leave this blank, we use the M/U/L short name below (e.g.{" "}
+          <span className="font-medium text-slate-700">M1U1L3-HW</span>).
+        </p>
+        <label className="block space-y-1.5">
           <span className={labelClass}>Type</span>
           <select name="assignmentType" defaultValue="hw" className={inputClass}>
             <option value="hw">HW</option>
@@ -79,9 +91,8 @@ export default async function NewAssignmentPage({
           </label>
         </div>
         <p className="text-xs text-slate-500">
-          Fill at least one. Saves as{" "}
-          <span className="font-medium text-slate-700">M1U1L3-HW</span> in each
-          period.
+          Fill at least one — this keeps the assignment unique across periods
+          even when you give it a custom name.
         </p>
         <label className="block space-y-1.5">
           <span className={labelClass}>Essay rubric unit (essays only)</span>

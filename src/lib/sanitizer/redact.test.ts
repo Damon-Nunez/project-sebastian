@@ -11,7 +11,7 @@ import {
   tokenForStudentId,
 } from "./index";
 import { rehydratePreparedAiText } from "./prepareAiText";
-import { sanitizeForAi } from "./redact";
+import { sanitizeForAi, SHARED_NAME_TOKEN } from "./redact";
 import type { RosterStudent } from "./types";
 
 const maria: RosterStudent = {
@@ -83,17 +83,21 @@ describe("V1 aliases (identifiers that feed the map)", () => {
     );
   });
 
-  it("does not redact a shared first name when two students share it", () => {
+  it("redacts a shared first name to the generic placeholder", () => {
     const mariaLopez: RosterStudent = {
       id: "55555555-5555-5555-5555-555555555555",
       name: "Maria Lopez",
     };
     const map = buildNameTokenMap([maria, mariaLopez]);
     const out = redact("Maria turned it in early.", map);
-    // Bare "Maria" is ambiguous — leave it. Full names still redact.
-    expect(out).toBe("Maria turned it in early.");
+    // Bare "Maria" can't be tied to one student — generic token. Full names still map.
+    expect(out).toBe(`${SHARED_NAME_TOKEN} turned it in early.`);
+    expect(rehydrate(out, map)).toBe("[student] turned it in early.");
     expect(redact("Maria Garcia and Maria Lopez.", map)).toBe(
       `${tokenForStudentId(maria.id)} and ${tokenForStudentId(mariaLopez.id)}.`,
+    );
+    expect(() => assertSanitizedForAi("Maria was late.", map)).toThrow(
+      SanitizerVerificationError,
     );
   });
 
@@ -113,7 +117,7 @@ describe("V1 aliases (identifiers that feed the map)", () => {
     );
   });
 
-  it("does not redact a nickname that duplicates another nickname", () => {
+  it("redacts a duplicated nickname to the generic placeholder", () => {
     const a: RosterStudent = {
       id: "a",
       name: "Maria Garcia",
@@ -125,7 +129,7 @@ describe("V1 aliases (identifiers that feed the map)", () => {
       nickname: "MJ",
     };
     const map = buildNameTokenMap([a, b]);
-    expect(redact("MJ turned it in.", map)).toBe("MJ turned it in.");
+    expect(redact("MJ turned it in.", map)).toBe(`${SHARED_NAME_TOKEN} turned it in.`);
   });
 
   it("does not redact a nickname that collides with another student's first name", () => {

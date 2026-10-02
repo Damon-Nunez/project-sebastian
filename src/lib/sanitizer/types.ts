@@ -24,6 +24,11 @@ export type NameTokenEntry = {
  */
 export type NameTokenMap = {
   entries: NameTokenEntry[];
+  /**
+   * First / last / nickname parts more than one student shares (two Marias).
+   * Redacted to a generic placeholder because they can't be tied to one student.
+   */
+  sharedAliases: string[];
 };
 
 /** Local document → student identity (no AI). */

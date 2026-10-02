@@ -10,6 +10,7 @@ import {
   getAssignmentForTeacher,
   setAssignmentReference,
 } from "@/lib/grading/assignments";
+import { deleteAssignmentForTeacher } from "@/lib/grading/deleteAssignment";
 import {
   gradingErrorRedirect,
   type GradingErrorCode,
@@ -17,6 +18,7 @@ import {
 import {
   hasAssignmentFolderPath,
   normalizeAssignmentFolderLabels,
+  normalizeFolderLabel,
 } from "@/lib/grading/labels";
 import {
   parseReferenceKind,
@@ -47,6 +49,7 @@ export async function createAssignmentAction(formData: FormData) {
     unitLabel: formString(formData, "unitLabel"),
     lessonLabel: formString(formData, "lessonLabel"),
   });
+  const title = normalizeFolderLabel(formString(formData, "title"));
 
   if (!hasAssignmentFolderPath(labels)) {
     redirect(gradingErrorRedirect(newPath, "assignment_path_required"));
@@ -69,6 +72,7 @@ export async function createAssignmentAction(formData: FormData) {
       assignmentType,
       labels,
       unitId,
+      title,
     });
     assignmentId = assignment.id;
   } catch (error) {
@@ -78,6 +82,32 @@ export async function createAssignmentAction(formData: FormData) {
 
   revalidatePath("/grading");
   redirect(`/grading/assignments/${assignmentId}`);
+}
+
+/** Delete the teacher-level assignment and every period folder under it. */
+export async function deleteAssignmentAction(formData: FormData) {
+  const teacher = await getCurrentTeacher();
+  const assignmentId = formString(formData, "assignmentId");
+  const fallback = assignmentId
+    ? `/grading/assignments/${assignmentId}`
+    : "/grading";
+
+  if (!assignmentId) {
+    redirect(gradingErrorRedirect("/grading", "assignment_not_found"));
+  }
+
+  try {
+    await deleteAssignmentForTeacher({
+      teacherId: teacher.id,
+      assignmentId,
+    });
+  } catch (error) {
+    console.error("deleteAssignmentAction failed", error);
+    redirect(gradingErrorRedirect(fallback, "delete_failed"));
+  }
+
+  revalidatePath("/grading");
+  redirect("/grading");
 }
 
 /**

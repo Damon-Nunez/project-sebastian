@@ -46,16 +46,17 @@ export default async function PeriodGradingPage({
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
           {period.name}
         </h1>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          Saved assignment folders for this class (M1U1L1-HW). New
-          work starts from{" "}
+        <p className="mt-3">
           <Link
             href="/grading"
-            className="font-medium text-slate-800 underline-offset-2 hover:underline"
+            className="text-sm font-medium text-slate-800 underline-offset-2 hover:underline"
           >
-            Upload homework
+            ← Back to grading
           </Link>
-          — folders appear here after you save.
+        </p>
+        <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+          Saved assignment folders for this class. New work starts from the
+          Assignments list on Grading — folders appear here after you file.
         </p>
       </div>
 

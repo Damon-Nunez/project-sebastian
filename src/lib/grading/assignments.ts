@@ -10,13 +10,14 @@ import type {
 } from "@/lib/db/types";
 import {
   hasAssignmentFolderPath,
+  normalizeFolderLabel,
   type AssignmentFolderLabels,
 } from "@/lib/grading/labels";
 import { deleteStoredStudentWorkFiles } from "@/lib/grading/upload";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const ASSIGNMENT_SELECT =
-  "id, teacher_id, assignment_type, module_label, unit_label, lesson_label, unit_id, reference_kind, reference_text, reference_filename, reference_storage_path, reference_updated_at, created_at, updated_at";
+  "id, teacher_id, assignment_type, title, module_label, unit_label, lesson_label, unit_id, reference_kind, reference_text, reference_filename, reference_storage_path, reference_updated_at, created_at, updated_at";
 
 export type AssignmentPeriodFolder = {
   session: Pick<GradingSessionRow, "id" | "section_id" | "status" | "updated_at">;
@@ -54,6 +55,7 @@ export async function findOrCreateAssignment(input: {
   assignmentType: AssignmentType;
   labels: AssignmentFolderLabels;
   unitId?: string | null;
+  title?: string | null;
 }): Promise<{ assignment: AssignmentRow; created: boolean }> {
   if (!hasAssignmentFolderPath(input.labels)) {
     throw new Error("Set Module, Unit, or Lesson so this assignment has a folder path.");
@@ -68,6 +70,7 @@ export async function findOrCreateAssignment(input: {
     .insert({
       teacher_id: input.teacherId,
       assignment_type: input.assignmentType,
+      title: normalizeFolderLabel(input.title),
       module_label: input.labels.module_label,
       unit_label: input.labels.unit_label,
       lesson_label: input.labels.lesson_label,
@@ -177,10 +180,32 @@ export async function setAssignmentReference(input: {
     existing.reference_storage_path &&
     existing.reference_storage_path !== nextPath
   ) {
-    await deleteStoredStudentWorkFiles([existing.reference_storage_path]);
+    await deleteStoredStudentWorkFiles([
+      { storage_path: existing.reference_storage_path },
+    ]);
   }
 
   return data as AssignmentRow;
+}
+
+/** Students who already have a paper filed in any period folder of this assignment. */
+export async function listFiledStudentIdsForAssignment(input: {
+  teacherId: string;
+  assignmentId: string;
+}): Promise<Set<string>> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("documents")
+    .select("student_id, grading_sessions!inner(assignment_id)")
+    .eq("teacher_id", input.teacherId)
+    .eq("kind", "student_work")
+    .eq("grading_sessions.assignment_id", input.assignmentId)
+    .not("student_id", "is", null);
+
+  if (error) {
+    throw new Error(`Failed to list filed students: ${error.message}`);
+  }
+  return new Set((data ?? []).map((row) => row.student_id as string));
 }
 
 /** Period folders filed under this assignment, with how many papers each holds. */

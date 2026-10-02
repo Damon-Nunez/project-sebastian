@@ -1,24 +1,22 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { deleteAssignmentFolderAction } from "@/app/grading/actions";
+import { deleteAssignmentAction } from "@/app/grading/assignmentActions";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 
-type DeleteAssignmentFolderButtonProps = {
-  sessionId: string;
-  periodId: string;
-  folderTitle: string;
+type DeleteAssignmentButtonProps = {
+  assignmentId: string;
+  assignmentTitle: string;
   variant?: "icon" | "button";
   className?: string;
 };
 
-export function DeleteAssignmentFolderButton({
-  sessionId,
-  periodId,
-  folderTitle,
+export function DeleteAssignmentButton({
+  assignmentId,
+  assignmentTitle,
   variant = "button",
   className,
-}: DeleteAssignmentFolderButtonProps) {
+}: DeleteAssignmentButtonProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [open, setOpen] = useState(false);
@@ -51,7 +49,7 @@ export function DeleteAssignmentFolderButton({
           setOpen(true);
         }}
       >
-        {variant === "icon" ? "Delete" : "Delete folder"}
+        {variant === "icon" ? "Delete" : "Delete assignment"}
       </button>
 
       <dialog
@@ -63,17 +61,15 @@ export function DeleteAssignmentFolderButton({
           if (e.target === dialogRef.current) close();
         }}
       >
-        <form action={deleteAssignmentFolderAction} className="space-y-4 p-6">
-          <input type="hidden" name="sessionId" value={sessionId} />
-          <input type="hidden" name="periodId" value={periodId} />
+        <form action={deleteAssignmentAction} className="space-y-4 p-6">
+          <input type="hidden" name="assignmentId" value={assignmentId} />
           <h2 id={titleId} className="text-base font-semibold text-slate-900">
-            Delete this period folder?
+            Delete this assignment?
           </h2>
           <p className="text-sm leading-6 text-slate-600">
-            <span className="font-medium text-slate-900">{folderTitle}</span>{" "}
-            for this class and the student work saved in it will be permanently
-            removed. The shared assignment and answer key stay. This cannot be
-            undone.
+            <span className="font-medium text-slate-900">{assignmentTitle}</span>
+            , its answer key, every period folder, and all student work under it
+            will be permanently removed. This cannot be undone.
           </p>
           <div className="flex justify-end gap-2">
             <button
@@ -84,7 +80,7 @@ export function DeleteAssignmentFolderButton({
               Cancel
             </button>
             <PendingSubmitButton
-              idleLabel="Delete folder"
+              idleLabel="Delete assignment"
               pendingLabel="Deleting…"
               className="rounded-lg bg-rose-700 px-3 py-2 text-sm font-medium text-white hover:bg-rose-800 disabled:cursor-wait disabled:opacity-70"
             />

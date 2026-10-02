@@ -24,17 +24,19 @@ export function findRemainingRosterAliases(
   map: NameTokenMap,
 ): string[] {
   const found: string[] = [];
+  const aliases = [
+    ...map.entries.flatMap((entry) => entry.aliases),
+    ...map.sharedAliases,
+  ];
 
-  for (const entry of map.entries) {
-    for (const alias of entry.aliases) {
-      const normalized = normalizePersonName(alias);
-      const body = aliasPatternBody(normalized);
-      if (!body) continue;
+  for (const alias of aliases) {
+    const normalized = normalizePersonName(alias);
+    const body = aliasPatternBody(normalized);
+    if (!body) continue;
 
-      const pattern = new RegExp(`(?<![\\p{L}])${body}(?![\\p{L}])`, "giu");
-      if (pattern.test(text)) {
-        found.push(normalized);
-      }
+    const pattern = new RegExp(`(?<![\\p{L}])${body}(?![\\p{L}])`, "giu");
+    if (pattern.test(text)) {
+      found.push(normalized);
     }
   }
 

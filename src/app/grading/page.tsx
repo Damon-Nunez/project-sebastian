@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { HomeworkUploadForm } from "@/components/HomeworkUploadForm";
+import { DeleteAssignmentButton } from "@/components/DeleteAssignmentButton";
 import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
 import { listAssignmentsForTeacher } from "@/lib/grading/assignments";
 import { gradingErrorMessage } from "@/lib/grading/errors";
@@ -30,9 +30,9 @@ export default async function GradingPage({ searchParams }: GradingPageProps) {
           Grade homework
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          Upload a student file first. We detect the name, match the period from
-          your roster, then you confirm the student and save into an M1U1L1-HW
-          folder. How the work is shown and graded comes next.
+          Open an assignment (or create one), add its answer key, then drop the
+          whole class&apos;s homework in. We match each file to a student and
+          you confirm before anything is filed.
         </p>
         <p className="mt-3 text-sm text-slate-500">
           Need a scoring guide first?{" "}
@@ -73,86 +73,86 @@ export default async function GradingPage({ searchParams }: GradingPageProps) {
           <p className="mt-4 text-sm text-slate-600">No assignments yet.</p>
         ) : (
           <ul className="mt-4 divide-y divide-slate-100">
-            {assignments.map((assignment) => (
-              <li key={assignment.id}>
+            {assignments.map((assignment) => {
+              const title = formatAssignmentFolderTitle(
+                assignment,
+                assignment.title,
+                assignment.assignment_type,
+              );
+              return (
+                <li
+                  key={assignment.id}
+                  className="flex items-center gap-2 py-2"
+                >
+                  <Link
+                    href={`/grading/assignments/${assignment.id}`}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-md px-2 py-2 text-sm transition hover:bg-slate-50"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-slate-900">
+                        {title}
+                      </span>
+                      {assignment.title ? (
+                        <span className="text-xs text-slate-500">
+                          {formatAssignmentFolderTitle(
+                            assignment,
+                            null,
+                            assignment.assignment_type,
+                          )}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      className={
+                        assignment.reference_updated_at === null
+                          ? "shrink-0 text-amber-700"
+                          : "shrink-0 text-slate-500"
+                      }
+                    >
+                      {assignment.reference_updated_at === null
+                        ? "Needs answer key"
+                        : referenceKindLabel(assignment.reference_kind)}
+                    </span>
+                  </Link>
+                  <DeleteAssignmentButton
+                    assignmentId={assignment.id}
+                    assignmentTitle={title}
+                    variant="icon"
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Past work by class
+        </h2>
+        <p className="mt-2 text-sm text-slate-600">
+          After you file, papers live under the period → M1U1L1-HW path.
+          Browse here when you need something back.
+        </p>
+        {periods.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-600">No classes yet.</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-slate-100">
+            {periods.map((period) => (
+              <li key={period.id}>
                 <Link
-                  href={`/grading/assignments/${assignment.id}`}
+                  href={`/grading/${period.id}`}
                   className="flex items-center justify-between gap-4 py-3 text-sm transition hover:bg-slate-50"
                 >
                   <span className="font-medium text-slate-900">
-                    {formatAssignmentFolderTitle(
-                      assignment,
-                      null,
-                      assignment.assignment_type,
-                    )}
+                    {period.name}
                   </span>
-                  <span
-                    className={
-                      assignment.reference_updated_at === null
-                        ? "text-amber-700"
-                        : "text-slate-500"
-                    }
-                  >
-                    {assignment.reference_updated_at === null
-                      ? "Needs answer key"
-                      : referenceKindLabel(assignment.reference_kind)}
-                  </span>
+                  <span className="text-slate-500">Browse</span>
                 </Link>
               </li>
             ))}
           </ul>
         )}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">
-            Upload homework
-          </h2>
-          {periods.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-600">
-              No periods yet.{" "}
-              <Link
-                href="/periods"
-                className="font-medium text-slate-800 underline-offset-2 hover:underline"
-              >
-                Set up periods
-              </Link>{" "}
-              so we can match students to a class.
-            </p>
-          ) : (
-            <HomeworkUploadForm />
-          )}
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">
-            Past work by class
-          </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            After you save, files live under the period → M1U1L1-HW path.
-            Browse here when you need something back.
-          </p>
-          {periods.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-600">No classes yet.</p>
-          ) : (
-            <ul className="mt-4 divide-y divide-slate-100">
-              {periods.map((period) => (
-                <li key={period.id}>
-                  <Link
-                    href={`/grading/${period.id}`}
-                    className="flex items-center justify-between gap-4 py-3 text-sm transition hover:bg-slate-50"
-                  >
-                    <span className="font-medium text-slate-900">
-                      {period.name}
-                    </span>
-                    <span className="text-slate-500">Browse</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </div>
     </section>
   );

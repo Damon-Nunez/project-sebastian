@@ -46,14 +46,17 @@ export function assignmentTypeFolderSuffix(
 }
 
 /**
- * Folder name like "M1U1L1-HW" (preferred short form).
- * Falls back to title, then "Untitled-HW".
+ * Display name for an assignment / period folder.
+ * Optional title wins; otherwise M1U1L1-HW; otherwise Untitled-HW.
  */
 export function formatAssignmentFolderTitle(
   labels: AssignmentFolderLabels,
   title?: string | null,
   assignmentType?: string | null,
 ): string {
+  const trimmedTitle = (title ?? "").trim();
+  if (trimmedTitle.length > 0) return trimmedTitle;
+
   const mul: string[] = [];
   if (labels.module_label) mul.push(`M${labels.module_label}`);
   if (labels.unit_label) mul.push(`U${labels.unit_label}`);
@@ -61,9 +64,7 @@ export function formatAssignmentFolderTitle(
   const suffix = assignmentTypeFolderSuffix(assignmentType);
 
   if (mul.length > 0) return `${mul.join("")}-${suffix}`;
-
-  const trimmedTitle = (title ?? "").trim();
-  return trimmedTitle.length > 0 ? trimmedTitle : `Untitled-${suffix}`;
+  return `Untitled-${suffix}`;
 }
 
 /** Compact key for comparisons / tests (null → ""). */

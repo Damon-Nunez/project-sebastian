@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { DocumentRow } from "@/lib/db/types";
+import { DOCUMENT_SELECT, type DocumentRow } from "@/lib/db/types";
 import {
   EmptyFrameworkTextError,
-  extractDocxText,
   extractPdfText,
   UnsupportedFrameworkFormatError,
 } from "@/lib/lessons/extract";
+import { extractDocxMarkedText } from "./docxMarkedText";
+import { listStudentsForTeacher } from "@/lib/roster/students";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   buildStudentWorkStoragePath,
@@ -13,14 +14,16 @@ import {
   isImageFormat,
   jpegPathFor,
   MAX_HOMEWORK_BYTES,
+  MAX_VISION_PAGES,
   needsVisionForText,
   parseTeacherStoragePath,
   STUDENT_WORK_BUCKET,
+  studentWorkStoragePaths,
+  visionPagePaths,
   type HomeworkFormat,
+  type VisionPage,
 } from "./studentWorkFiles";
-
-const DOCUMENT_SELECT =
-  "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, student_id, body_text, needs_vision, created_at, updated_at";
+import { prepareVisionPages, renderPdfPages } from "./vision";
 
 /** Long edge for stored photos — enough for vision grading, small enough to stay cheap. */
 const MAX_IMAGE_EDGE_PX = 2000;
@@ -117,14 +120,17 @@ type PreparedStudentWork = {
   storagePath: string;
   bodyText: string | null;
   needsVision: boolean;
+  visionPages: VisionPage[] | null;
 };
 
 async function prepareStoredStudentWork(input: {
+  teacherId: string;
   storagePath: string;
   format: HomeworkFormat;
   bytes: Buffer;
 }): Promise<PreparedStudentWork> {
   const admin = createAdminSupabaseClient();
+  const roster = () => listStudentsForTeacher(input.teacherId);
 
   if (isImageFormat(input.format)) {
     const jpeg = await normalizeHomeworkImage(input.bytes, input.format);
@@ -138,12 +144,33 @@ async function prepareStoredStudentWork(input: {
     if (storagePath !== input.storagePath) {
       await admin.storage.from(STUDENT_WORK_BUCKET).remove([input.storagePath]);
     }
-    return { storagePath, bodyText: null, needsVision: true };
+    const vision = await prepareVisionPages({
+      pages: [
+        {
+          jpeg,
+          originalPath: storagePath,
+          maskedPath: visionPagePaths(storagePath, 1).maskedPath,
+          storeOriginal: false,
+        },
+      ],
+      roster: await roster(),
+    });
+    return {
+      storagePath,
+      bodyText: vision.text || null,
+      needsVision: true,
+      visionPages: vision.pages,
+    };
   }
 
   if (input.format === "docx") {
-    const text = await extractDocxText(input.bytes);
-    return { storagePath: input.storagePath, bodyText: text, needsVision: false };
+    const text = await extractDocxMarkedText(input.bytes);
+    return {
+      storagePath: input.storagePath,
+      bodyText: text,
+      needsVision: false,
+      visionPages: null,
+    };
   }
 
   let text = "";
@@ -152,11 +179,45 @@ async function prepareStoredStudentWork(input: {
   } catch (error) {
     if (!(error instanceof EmptyFrameworkTextError)) throw error;
   }
+  if (!needsVisionForText(text)) {
+    return {
+      storagePath: input.storagePath,
+      bodyText: text,
+      needsVision: false,
+      visionPages: null,
+    };
+  }
+
+  let rendered: Buffer[] = [];
+  try {
+    rendered = await renderPdfPages(input.bytes);
+  } catch (error) {
+    console.error("renderPdfPages failed — scan stays ungraded", error);
+  }
+  const vision = await prepareVisionPages({
+    pages: rendered.map((jpeg, index) => ({
+      jpeg,
+      ...visionPagePaths(input.storagePath, index + 1),
+      storeOriginal: true,
+    })),
+    roster: await roster(),
+  });
   return {
     storagePath: input.storagePath,
-    bodyText: text || null,
-    needsVision: needsVisionForText(text),
+    bodyText: vision.text || text || null,
+    needsVision: true,
+    visionPages: vision.pages.length > 0 ? vision.pages : null,
   };
+}
+
+/** Everything an upload may have written, for cleanup when finalizing fails. */
+function possibleUploadPaths(storagePath: string): string[] {
+  const paths = [storagePath, jpegPathFor(storagePath)];
+  for (let page = 1; page <= MAX_VISION_PAGES; page++) {
+    const { originalPath, maskedPath } = visionPagePaths(storagePath, page);
+    paths.push(originalPath, maskedPath);
+  }
+  return paths;
 }
 
 async function removeStoredStudentWork(paths: string[]): Promise<void> {
@@ -171,11 +232,12 @@ async function removeStoredStudentWork(paths: string[]): Promise<void> {
 
 /**
  * Step 2 of an upload: read the bytes the browser put in Storage, normalize
- * photos, extract text (or flag needs_vision), and create the student_work row.
- * grading_session_id stays null until the teacher saves into an assignment folder.
+ * photos, extract text (or flag needs_vision), and create the student_work row
+ * under the assignment. grading_session_id stays null until the teacher confirms.
  */
 export async function finalizeStudentWorkUpload(input: {
   teacherId: string;
+  assignmentId: string;
   storagePath: string;
   filename: string;
 }): Promise<HomeworkUploadResult> {
@@ -207,6 +269,7 @@ export async function finalizeStudentWorkUpload(input: {
     }
 
     prepared = await prepareStoredStudentWork({
+      teacherId: input.teacherId,
       storagePath: input.storagePath,
       format,
       bytes,
@@ -224,6 +287,8 @@ export async function finalizeStudentWorkUpload(input: {
         student_id: null,
         body_text: prepared.bodyText,
         needs_vision: prepared.needsVision,
+        vision_pages: prepared.visionPages,
+        assignment_id: input.assignmentId,
         updated_at: new Date().toISOString(),
       })
       .select(DOCUMENT_SELECT)
@@ -237,10 +302,7 @@ export async function finalizeStudentWorkUpload(input: {
 
     return { document: data as DocumentRow };
   } catch (error) {
-    await removeStoredStudentWork([
-      input.storagePath,
-      prepared?.storagePath ?? "",
-    ]);
+    await removeStoredStudentWork(possibleUploadPaths(input.storagePath));
     throw error;
   }
 }
@@ -277,7 +339,7 @@ export async function extractStoredDocumentText(input: {
   try {
     const bytes = Buffer.from(await blob.arrayBuffer());
     return format === "docx"
-      ? await extractDocxText(bytes)
+      ? await extractDocxMarkedText(bytes)
       : await extractPdfText(bytes);
   } catch (extractError) {
     await removeStoredStudentWork([input.storagePath]);
@@ -285,28 +347,74 @@ export async function extractStoredDocumentText(input: {
   }
 }
 
-export async function createSignedStudentWorkUrl(
-  storagePath: string,
+/** Signed preview URLs keyed by storage path; missing paths are left out. */
+export async function createSignedStudentWorkUrls(
+  storagePaths: string[],
   expiresInSeconds = 10 * 60,
-): Promise<string | null> {
+): Promise<Map<string, string>> {
+  const urls = new Map<string, string>();
+  if (storagePaths.length === 0) return urls;
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin.storage
     .from(STUDENT_WORK_BUCKET)
-    .createSignedUrl(storagePath, expiresInSeconds);
+    .createSignedUrls(storagePaths, expiresInSeconds);
   if (error) {
-    console.error("createSignedStudentWorkUrl failed", error);
-    return null;
+    console.error("createSignedStudentWorkUrls failed", error);
+    return urls;
   }
-  return data.signedUrl;
+  for (const item of data ?? []) {
+    if (item.path && item.signedUrl) urls.set(item.path, item.signedUrl);
+  }
+  return urls;
+}
+
+/** Batch uploads dropped into this assignment that aren't in a period folder yet. */
+export async function listUnfiledStudentWorkForAssignment(input: {
+  teacherId: string;
+  assignmentId: string;
+}): Promise<DocumentRow[]> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("documents")
+    .select(DOCUMENT_SELECT)
+    .eq("teacher_id", input.teacherId)
+    .eq("assignment_id", input.assignmentId)
+    .eq("kind", "student_work")
+    .is("grading_session_id", null)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to list unfiled homework: ${error.message}`);
+  }
+  return (data ?? []) as DocumentRow[];
+}
+
+/** Remove an unfiled upload (row + stored file). Filed work is left alone. */
+export async function deleteUnfiledStudentWork(input: {
+  teacherId: string;
+  documentId: string;
+}): Promise<void> {
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("documents")
+    .delete()
+    .eq("teacher_id", input.teacherId)
+    .eq("id", input.documentId)
+    .eq("kind", "student_work")
+    .is("grading_session_id", null)
+    .select("storage_path, vision_pages");
+
+  if (error) {
+    throw new Error(`Failed to remove homework: ${error.message}`);
+  }
+  await removeStoredStudentWork((data ?? []).flatMap(studentWorkStoragePaths));
 }
 
 /** Best-effort Storage cleanup when student_work rows are deleted. */
 export async function deleteStoredStudentWorkFiles(
-  storagePaths: Array<string | null>,
+  rows: Array<{ storage_path: string | null; vision_pages?: unknown }>,
 ): Promise<void> {
-  await removeStoredStudentWork(
-    storagePaths.filter((p): p is string => Boolean(p)),
-  );
+  await removeStoredStudentWork(rows.flatMap(studentWorkStoragePaths));
 }
 
 export async function getStudentWorkForTeacher(input: {
@@ -327,64 +435,4 @@ export async function getStudentWorkForTeacher(input: {
   }
 
   return (data as DocumentRow | null) ?? null;
-}
-
-export async function updateStudentWorkBodyText(input: {
-  teacherId: string;
-  documentId: string;
-  bodyText: string;
-}): Promise<DocumentRow> {
-  const admin = createAdminSupabaseClient();
-  const now = new Date().toISOString();
-
-  const { data, error } = await admin
-    .from("documents")
-    .update({
-      body_text: input.bodyText,
-      updated_at: now,
-    })
-    .eq("teacher_id", input.teacherId)
-    .eq("id", input.documentId)
-    .eq("kind", "student_work")
-    .select(DOCUMENT_SELECT)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Failed to update homework text: ${error.message}`);
-  }
-  if (!data) {
-    throw new Error("Homework document not found");
-  }
-
-  return data as DocumentRow;
-}
-
-export async function assignStudentToStudentWork(input: {
-  teacherId: string;
-  documentId: string;
-  studentId: string;
-}): Promise<DocumentRow> {
-  const admin = createAdminSupabaseClient();
-  const now = new Date().toISOString();
-
-  const { data, error } = await admin
-    .from("documents")
-    .update({
-      student_id: input.studentId,
-      updated_at: now,
-    })
-    .eq("teacher_id", input.teacherId)
-    .eq("id", input.documentId)
-    .eq("kind", "student_work")
-    .select(DOCUMENT_SELECT)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Failed to assign student: ${error.message}`);
-  }
-  if (!data) {
-    throw new Error("Homework document not found");
-  }
-
-  return data as DocumentRow;
 }

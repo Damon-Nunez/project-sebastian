@@ -1,117 +1,99 @@
-import type {
-  AssignmentType,
-  DocumentRow,
-  GradingSessionRow,
-  GradingSuggestionRow,
-} from "@/lib/db/types";
 import {
-  findOrCreateAssignmentFolder,
-  getGradingSessionForTeacher,
-} from "@/lib/grading/sessions";
+  DOCUMENT_SELECT,
+  type AiGradingStatus,
+  type AssignmentRow,
+  type DocumentRow,
+  type GradingSessionRow,
+  type GradingSuggestionRow,
+} from "@/lib/db/types";
+import { findOrCreateAssignmentFolder } from "@/lib/grading/sessions";
+import { parseVisionPages } from "@/lib/grading/studentWorkFiles";
 import { getStudentWorkForTeacher } from "@/lib/grading/upload";
 import { getStudentForTeacher } from "@/lib/roster/students";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
-const SUGGESTION_SELECT =
-  "id, teacher_id, grading_session_id, student_id, document_id, suggested_range_low, suggested_range_high, suggested_comment, accommodation_flagged, teacher_grade, teacher_comment, status, created_at, updated_at";
+export const SUGGESTION_SELECT =
+  "id, teacher_id, grading_session_id, student_id, document_id, suggested_range_low, suggested_range_high, suggested_comment, accommodation_flagged, teacher_grade, teacher_comment, status, ai_status, grading_detail, graded_reference_at, created_at, updated_at";
 
-const DOCUMENT_SELECT =
-  "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, student_id, body_text, needs_vision, created_at, updated_at";
+/** Photos wait for the teacher to approve the masked preview before any AI call. */
+export function initialAiStatus(
+  document: Pick<DocumentRow, "needs_vision" | "vision_pages">,
+): AiGradingStatus {
+  if (!document.needs_vision) return "pending";
+  return parseVisionPages(document.vision_pages).length > 0
+    ? "awaiting_approval"
+    : "needs_vision";
+}
 
-export type FileHomeworkResult = {
-  session: GradingSessionRow;
-  document: DocumentRow;
-  suggestion: GradingSuggestionRow;
-};
-
-export async function fileStudentWorkIntoAssignmentFolder(input: {
+/**
+ * File an unfiled upload into the student's period folder for this
+ * assignment (folder found or created on the teacher's confirm click).
+ * The document update only matches while it is still unfiled, so a double
+ * click can't file it twice.
+ */
+export async function fileBatchWork(input: {
   teacherId: string;
+  assignment: AssignmentRow;
   documentId: string;
-  bodyText?: string | null;
-  assignmentType: AssignmentType;
-  moduleLabel?: string | null;
-  unitLabel?: string | null;
-  lessonLabel?: string | null;
-  title?: string | null;
-  unitId?: string | null;
-}): Promise<FileHomeworkResult> {
-  const document = await getStudentWorkForTeacher({
-    teacherId: input.teacherId,
-    documentId: input.documentId,
-  });
-  if (!document) {
-    throw new Error("Homework document not found");
-  }
-  if (!document.student_id) {
-    throw new Error("Assign a student before saving into a folder.");
-  }
-
-  const student = await getStudentForTeacher(
-    input.teacherId,
-    document.student_id,
-  );
+  studentId: string;
+}): Promise<GradingSessionRow> {
+  const [document, student] = await Promise.all([
+    getStudentWorkForTeacher({
+      teacherId: input.teacherId,
+      documentId: input.documentId,
+    }),
+    getStudentForTeacher(input.teacherId, input.studentId),
+  ]);
   if (!student) {
     throw new Error("Student not found");
+  }
+  if (
+    !document ||
+    document.assignment_id !== input.assignment.id ||
+    document.grading_session_id !== null
+  ) {
+    throw new Error("Homework document not found");
   }
 
   const { session } = await findOrCreateAssignmentFolder({
     teacherId: input.teacherId,
     sectionId: student.section_id,
-    assignmentType: input.assignmentType,
-    moduleLabel: input.moduleLabel,
-    unitLabel: input.unitLabel,
-    lessonLabel: input.lessonLabel,
-    title: input.title,
-    unitId: input.unitId,
+    assignmentType: input.assignment.assignment_type,
+    moduleLabel: input.assignment.module_label,
+    unitLabel: input.assignment.unit_label,
+    lessonLabel: input.assignment.lesson_label,
+    unitId: input.assignment.unit_id,
+    title: input.assignment.title,
   });
 
-  const linked = await linkStudentWorkToSession({
-    teacherId: input.teacherId,
-    documentId: input.documentId,
-    sessionId: session.id,
-  });
-
-  const suggestion = await upsertDraftSuggestion({
-    teacherId: input.teacherId,
-    sessionId: session.id,
-    studentId: student.id,
-    documentId: input.documentId,
-  });
-
-  return {
-    session,
-    document: linked,
-    suggestion,
-  };
-}
-
-async function linkStudentWorkToSession(input: {
-  teacherId: string;
-  documentId: string;
-  sessionId: string;
-}): Promise<DocumentRow> {
-  const admin = createAdminSupabaseClient();
-  const now = new Date().toISOString();
-
-  const { data, error } = await admin
+  const { data: filed, error } = await createAdminSupabaseClient()
     .from("documents")
     .update({
-      grading_session_id: input.sessionId,
-      updated_at: now,
+      student_id: student.id,
+      grading_session_id: session.id,
+      updated_at: new Date().toISOString(),
     })
     .eq("teacher_id", input.teacherId)
-    .eq("id", input.documentId)
+    .eq("id", document.id)
     .eq("kind", "student_work")
+    .is("grading_session_id", null)
     .select(DOCUMENT_SELECT)
     .maybeSingle();
-
   if (error) {
     throw new Error(`Failed to file homework into folder: ${error.message}`);
   }
-  if (!data) {
+  if (!filed) {
     throw new Error("Homework document not found");
   }
-  return data as DocumentRow;
+
+  await upsertDraftSuggestion({
+    teacherId: input.teacherId,
+    sessionId: session.id,
+    studentId: student.id,
+    documentId: document.id,
+    aiStatus: initialAiStatus(filed as DocumentRow),
+  });
+  return session;
 }
 
 async function upsertDraftSuggestion(input: {
@@ -119,6 +101,7 @@ async function upsertDraftSuggestion(input: {
   sessionId: string;
   studentId: string;
   documentId: string;
+  aiStatus: AiGradingStatus;
 }): Promise<GradingSuggestionRow> {
   const admin = createAdminSupabaseClient();
   const now = new Date().toISOString();
@@ -141,6 +124,7 @@ async function upsertDraftSuggestion(input: {
         grading_session_id: input.sessionId,
         student_id: input.studentId,
         document_id: input.documentId,
+        ai_status: input.aiStatus,
         updated_at: now,
       })
       .eq("teacher_id", input.teacherId)
@@ -164,6 +148,7 @@ async function upsertDraftSuggestion(input: {
       student_id: input.studentId,
       document_id: input.documentId,
       status: "draft",
+      ai_status: input.aiStatus,
       updated_at: now,
     })
     .select(SUGGESTION_SELECT)
@@ -175,103 +160,4 @@ async function upsertDraftSuggestion(input: {
     );
   }
   return data as GradingSuggestionRow;
-}
-
-/**
- * After a student change on already-filed work, move the document and
- * draft suggestion into the matching folder for that student's period.
- */
-export async function refileFiledHomeworkToStudent(input: {
-  teacherId: string;
-  documentId: string;
-}): Promise<{
-  document: DocumentRow;
-  previousSessionId: string | null;
-  previousPeriodId: string | null;
-  session: GradingSessionRow | null;
-}> {
-  const document = await getStudentWorkForTeacher({
-    teacherId: input.teacherId,
-    documentId: input.documentId,
-  });
-  if (!document) {
-    throw new Error("Homework document not found");
-  }
-  if (!document.student_id || !document.grading_session_id) {
-    return {
-      document,
-      previousSessionId: document.grading_session_id,
-      previousPeriodId: null,
-      session: null,
-    };
-  }
-
-  const [student, previous] = await Promise.all([
-    getStudentForTeacher(input.teacherId, document.student_id),
-    getGradingSessionForTeacher({
-      teacherId: input.teacherId,
-      sessionId: document.grading_session_id,
-    }),
-  ]);
-  if (!student) {
-    throw new Error("Student not found");
-  }
-  if (!previous) {
-    return {
-      document,
-      previousSessionId: document.grading_session_id,
-      previousPeriodId: null,
-      session: null,
-    };
-  }
-
-  const { session } = await findOrCreateAssignmentFolder({
-    teacherId: input.teacherId,
-    sectionId: student.section_id,
-    assignmentType: previous.assignment_type,
-    moduleLabel: previous.module_label,
-    unitLabel: previous.unit_label,
-    lessonLabel: previous.lesson_label,
-    title: previous.title,
-  });
-
-  const linked = await linkStudentWorkToSession({
-    teacherId: input.teacherId,
-    documentId: input.documentId,
-    sessionId: session.id,
-  });
-
-  await upsertDraftSuggestion({
-    teacherId: input.teacherId,
-    sessionId: session.id,
-    studentId: student.id,
-    documentId: input.documentId,
-  });
-
-  return {
-    document: linked,
-    previousSessionId: previous.id,
-    previousPeriodId: previous.section_id,
-    session,
-  };
-}
-
-export async function listStudentWorkForSession(input: {
-  teacherId: string;
-  sessionId: string;
-}): Promise<DocumentRow[]> {
-  const admin = createAdminSupabaseClient();
-  const { data, error } = await admin
-    .from("documents")
-    .select(DOCUMENT_SELECT)
-    .eq("teacher_id", input.teacherId)
-    .eq("grading_session_id", input.sessionId)
-    .eq("kind", "student_work")
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    throw new Error(`Failed to list homework in folder: ${error.message}`);
-  }
-
-  return (data ?? []) as DocumentRow[];
 }

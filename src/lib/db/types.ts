@@ -112,9 +112,16 @@ export type DocumentRow = {
   body_text: string | null;
   /** Photo / scanned PDF with empty or sparse text — grade from the stored image (migration 020). */
   needs_vision: boolean;
+  /** Assignment a batch upload was dropped into (migration 022). */
+  assignment_id: string | null;
+  /** Original + masked page images (migration 024); see `parseVisionPages`. */
+  vision_pages: unknown;
   created_at: string;
   updated_at: string;
 };
+
+export const DOCUMENT_SELECT =
+  "id, teacher_id, kind, original_filename, storage_path, lesson_plan_id, grading_session_id, student_id, body_text, needs_vision, assignment_id, vision_pages, created_at, updated_at";
 
 export type LessonWorksheetRow = {
   id: string;
@@ -152,6 +159,8 @@ export type AssignmentRow = {
   id: string;
   teacher_id: string;
   assignment_type: AssignmentType;
+  /** Optional display name; when set, shown instead of the M/U/L short form. */
+  title: string | null;
   module_label: string | null;
   unit_label: string | null;
   lesson_label: string | null;
@@ -180,9 +189,23 @@ export type GradingSuggestionRow = {
   teacher_grade: number | null;
   teacher_comment: string | null;
   status: DraftFinalStatus;
+  /** AI grading progress (migration 023). Null for rows filed before 2.4. */
+  ai_status: AiGradingStatus | null;
+  /** Validated per-question + rubric detail; see `@/lib/grading/gradeSchema`. */
+  grading_detail: unknown;
+  graded_reference_at: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type AiGradingStatus =
+  | "pending"
+  | "grading"
+  | "graded"
+  | "failed"
+  | "needs_vision"
+  | "awaiting_approval"
+  | "manual";
 
 /** Table names used by the domain schema (for health / smoke checks). */
 export const DOMAIN_TABLES = [

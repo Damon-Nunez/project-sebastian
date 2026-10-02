@@ -189,9 +189,11 @@ export async function findOrCreateAssignmentFolder(
 
   const admin = createAdminSupabaseClient();
   const now = new Date().toISOString();
-  const folderTitle =
-    title ??
-    formatAssignmentFolderTitle(labels, null, input.assignmentType);
+  const folderTitle = formatAssignmentFolderTitle(
+    labels,
+    title,
+    input.assignmentType,
+  );
 
   const { data, error } = await admin
     .from("grading_sessions")
@@ -255,15 +257,13 @@ export async function deleteGradingSessionForTeacher(input: {
     .eq("teacher_id", input.teacherId)
     .eq("grading_session_id", input.sessionId)
     .eq("kind", "student_work")
-    .select("storage_path");
+    .select("storage_path, vision_pages");
 
   if (docsError) {
     throw new Error(`Failed to delete homework in folder: ${docsError.message}`);
   }
 
-  await deleteStoredStudentWorkFiles(
-    (deletedDocs ?? []).map((doc) => doc.storage_path as string | null),
-  );
+  await deleteStoredStudentWorkFiles(deletedDocs ?? []);
 
   const { data, error } = await admin
     .from("grading_sessions")

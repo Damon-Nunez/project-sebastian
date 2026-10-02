@@ -95,13 +95,21 @@ describe("formatAssignmentFolderTitle", () => {
     ).toBe("M1L7-HW");
   });
 
-  it("falls back to title then Untitled-HW", () => {
+  it("optional title wins over M/U/L", () => {
     expect(
       formatAssignmentFolderTitle(
-        { module_label: null, unit_label: null, lesson_label: null },
-        "Quiz 3",
+        {
+          module_label: "1",
+          unit_label: "1",
+          lesson_label: "1",
+        },
+        "Mango Ch1",
+        "hw",
       ),
-    ).toBe("Quiz 3");
+    ).toBe("Mango Ch1");
+  });
+
+  it("falls back to Untitled-HW when nothing is set", () => {
     expect(
       formatAssignmentFolderTitle({
         module_label: null,
