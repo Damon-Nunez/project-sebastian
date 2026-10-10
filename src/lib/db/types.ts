@@ -170,6 +170,10 @@ export type AssignmentRow = {
   /** Exemplars may contain student PII — sanitize before any AI call. */
   reference_text: string | null;
   reference_filename: string | null;
+  /**
+   * First page path, or JSON `{"v":1,"pages":[...]}` when the key has multiple
+   * photo pages (Ticket 11). Grading uses reference_text.
+   */
   reference_storage_path: string | null;
   reference_updated_at: string | null;
   created_at: string;

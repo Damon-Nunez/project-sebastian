@@ -126,7 +126,7 @@ export default async function AssignmentPage({
         <p className="mt-3 text-sm">
           {!referenceSet ? (
             <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-900">
-              Add an answer key or example below
+              Add an answer key or example first
             </span>
           ) : assignment.reference_kind === "none" ? (
             <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
@@ -137,6 +137,10 @@ export default async function AssignmentPage({
               {referenceKindLabel(assignment.reference_kind)} saved
             </span>
           )}
+        </p>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+          Order of work: answer key → homework upload → combine multi-page photos
+          (if needed) → file into period folders.
         </p>
       </div>
 
@@ -150,10 +154,36 @@ export default async function AssignmentPage({
       ) : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Upload homework</h2>
+        <h2 className="text-sm font-semibold text-slate-900">
+          1. Answer key or example
+        </h2>
         <p className="mt-2 text-sm text-slate-600">
-          We match each file to a student and check it against the answer key.
-          Nothing is filed until you confirm.
+          Shared by every period&apos;s {title} folder. Drop a .docx, .pdf, or
+          all photo pages at once — photo keys are read with AI into a clean
+          1. A / 2. B list you can edit before grading.
+        </p>
+        <div className="mt-4">
+          <AssignmentReferenceForm
+            key={assignment.reference_updated_at ?? "unset"}
+            assignmentId={assignment.id}
+            initialKind={initialKind}
+            initialText={assignment.reference_text ?? ""}
+            currentFilename={assignment.reference_filename}
+            referenceSet={referenceSet}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">
+          2. Upload homework
+        </h2>
+        <p className="mt-2 text-sm text-slate-600">
+          After the answer key. We match each file to a student and check it
+          against the key. Nothing is filed until you confirm.
+          {combinable.length >= 2
+            ? " After upload, combine multi-page photos in the next section before filing."
+            : ""}
         </p>
         <div className="mt-4">
           {periods.length === 0 ? (
@@ -173,33 +203,19 @@ export default async function AssignmentPage({
         </div>
       </div>
 
-      <GradingRunner
-        assignmentId={assignment.id}
-        pendingIds={gradingQueue.pendingIds}
-        failedCount={gradingQueue.failedIds.length}
-      />
-
-      {gradingQueue.awaitingApproval > 0 ? (
-        <p className="rounded-xl border border-violet-200 bg-violet-50 px-6 py-4 text-sm text-violet-950">
-          {gradingQueue.awaitingApproval}{" "}
-          {gradingQueue.awaitingApproval === 1 ? "photo is" : "photos are"} waiting
-          for you to check the masked preview. Open the period folder below to
-          approve them for grading.
-        </p>
-      ) : null}
-
       {combinable.length >= 2 ? (
         <form
           action={combineUnfiledPagesAction}
-          className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+          className="rounded-xl border border-amber-200 bg-amber-50/40 p-6 shadow-sm"
         >
           <input type="hidden" name="assignmentId" value={assignment.id} />
           <h2 className="text-sm font-semibold text-slate-900">
-            Several photos of one paper?
+            3. Combine multi-page photos first
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Check the pages that belong together, then combine. Pages go in
-            file-name order.
+          <p className="mt-2 text-sm text-slate-700">
+            Do this before filing. Each unchecked photo is treated as its own
+            paper — combine pages that belong to the same student first. Pages
+            go in file-name order.
           </p>
           <ul className="mt-4 flex flex-wrap gap-4">
             {combinable.map((item) => {
@@ -208,7 +224,8 @@ export default async function AssignmentPage({
                 .endsWith(".jpg")
                 ? previewFor(item.document.storage_path)
                 : null;
-              const pageCount = parseVisionPages(item.document.vision_pages).length;
+              const pageCount = parseVisionPages(item.document.vision_pages)
+                .length;
               return (
                 <li key={item.document.id}>
                   <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -240,7 +257,7 @@ export default async function AssignmentPage({
           </ul>
           <button
             type="submit"
-            className="mt-4 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            className="mt-4 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
           >
             Combine checked photos
           </button>
@@ -250,11 +267,14 @@ export default async function AssignmentPage({
       {ready.length > 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">
-            Ready to file ({ready.length})
+            {combinable.length >= 2 ? "4. " : "3. "}Ready to file ({ready.length})
           </h2>
           <p className="mt-2 text-sm text-slate-600">
             Clean student match and it lines up with the answer key. Uncheck
             anything that looks wrong.
+            {combinable.length >= 2
+              ? " Combine multi-page photos above before filing those students."
+              : ""}
           </p>
           <div className="mt-4">
             <ReadyWorkList
@@ -273,6 +293,9 @@ export default async function AssignmentPage({
           </h2>
           <p className="mt-2 text-sm text-slate-600">
             Pick the student for each one, then file it.
+            {combinable.length >= 2
+              ? " If several photos are one paper, combine them in the section above first."
+              : ""}
           </p>
           <ul className="mt-4 divide-y divide-slate-100">
             {unsorted.map((item) => {
@@ -280,7 +303,8 @@ export default async function AssignmentPage({
               const isPhoto =
                 item.document.storage_path?.toLowerCase().endsWith(".jpg") ??
                 false;
-              const pageCount = parseVisionPages(item.document.vision_pages).length;
+              const pageCount = parseVisionPages(item.document.vision_pages)
+                .length;
               return (
                 <li
                   key={item.document.id}
@@ -360,53 +384,48 @@ export default async function AssignmentPage({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">
-            Answer key or example
-          </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Shared by every period&apos;s {title} folder.
-          </p>
-          <div className="mt-4">
-            <AssignmentReferenceForm
-              key={assignment.reference_updated_at ?? "unset"}
-              assignmentId={assignment.id}
-              initialKind={initialKind}
-              initialText={assignment.reference_text ?? ""}
-              currentFilename={assignment.reference_filename}
-            />
-          </div>
-        </div>
+      <GradingRunner
+        assignmentId={assignment.id}
+        pendingIds={gradingQueue.pendingIds}
+        failedCount={gradingQueue.failedIds.length}
+      />
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">Period folders</h2>
-          {folders.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-600">
-              No student work filed yet. A period&apos;s folder is created the
-              first time you file a paper for one of its students.
-            </p>
-          ) : (
-            <ul className="mt-4 divide-y divide-slate-100">
-              {folders.map((folder) => (
-                <li key={folder.session.id}>
-                  <Link
-                    href={`/grading/${folder.session.section_id}/${folder.session.id}`}
-                    className="flex items-center justify-between gap-4 py-3 text-sm transition hover:bg-slate-50"
-                  >
-                    <span className="font-medium text-slate-900">
-                      {folder.periodName}
-                    </span>
-                    <span className="text-slate-500">
-                      {folder.documentCount}{" "}
-                      {folder.documentCount === 1 ? "paper" : "papers"}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      {gradingQueue.awaitingApproval > 0 ? (
+        <p className="rounded-xl border border-violet-200 bg-violet-50 px-6 py-4 text-sm text-violet-950">
+          {gradingQueue.awaitingApproval}{" "}
+          {gradingQueue.awaitingApproval === 1 ? "photo is" : "photos are"} waiting
+          for you to check the masked preview. Open the period folder below to
+          approve them for grading.
+        </p>
+      ) : null}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Period folders</h2>
+        {folders.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-600">
+            No student work filed yet. A period&apos;s folder is created the
+            first time you file a paper for one of its students.
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-slate-100">
+            {folders.map((folder) => (
+              <li key={folder.session.id}>
+                <Link
+                  href={`/grading/${folder.session.section_id}/${folder.session.id}`}
+                  className="flex items-center justify-between gap-4 py-3 text-sm transition hover:bg-slate-50"
+                >
+                  <span className="font-medium text-slate-900">
+                    {folder.periodName}
+                  </span>
+                  <span className="text-slate-500">
+                    {folder.documentCount}{" "}
+                    {folder.documentCount === 1 ? "paper" : "papers"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

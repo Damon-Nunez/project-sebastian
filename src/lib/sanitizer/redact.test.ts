@@ -272,6 +272,42 @@ describe("sanitizeForAi / prepareTextForAi", () => {
       assertSanitizedForAi("Still says Maria Garcia out loud.", map),
     ).toThrow(SanitizerVerificationError);
   });
+
+  it("skips single-letter aliases so MC options and UUID hex stay intact", () => {
+    const student: RosterStudent = {
+      id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      name: "A Smith",
+      nickname: "A",
+    };
+    const aliases = aliasesForRoster([student]);
+    expect(aliases.get(student.id)).toEqual(
+      expect.arrayContaining(["A Smith", "Smith A", "Smith, A", "Smith"]),
+    );
+    expect(aliases.get(student.id)).not.toContain("A");
+
+    const prompt =
+      "Answer key: 1. A  2. B  3. C\nStudent A Smith chose A.";
+    const { sanitizedText } = prepareTextForAi(prompt, [student]);
+    expect(sanitizedText).toContain("1. A");
+    expect(sanitizedText).toContain("chose A");
+    expect(sanitizedText).toContain(tokenForStudentId(student.id));
+    expect(sanitizedText).not.toContain("A Smith");
+  });
+
+  it("does not scan or rewrite inside [[STU_…]] tokens", () => {
+    const student: RosterStudent = {
+      id: "deadbeef-0000-0000-0000-0000000000be",
+      name: "Be Cole",
+    };
+    const { sanitizedText, map } = prepareTextForAi(
+      "Be Cole and also Be again.",
+      [student],
+    );
+    expect(sanitizedText).toBe(
+      `${tokenForStudentId(student.id)} and also ${tokenForStudentId(student.id)} again.`,
+    );
+    expect(() => assertSanitizedForAi(sanitizedText, map)).not.toThrow();
+  });
 });
 
 describe("matchStudentFromDocument", () => {

@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type DragEvent } from "react";
+import { useState } from "react";
 import {
   finalizeBatchUploadAction,
   requestBatchUploadAction,
   type BatchUploadTarget,
 } from "@/app/grading/batchActions";
+import { FileDropzone } from "@/components/FileDropzone";
 import { gradingErrorMessage } from "@/lib/grading/errors";
 import {
   HOMEWORK_ACCEPT,
@@ -20,8 +21,6 @@ type FailedFile = { file: File; message: string };
 
 export function BatchUploadDropzone({ assignmentId }: { assignmentId: string }) {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
@@ -89,54 +88,16 @@ export function BatchUploadDropzone({ assignmentId }: { assignmentId: string }) 
     router.refresh();
   }
 
-  function handleDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setDragging(false);
-    void uploadBatch(Array.from(event.dataTransfer.files));
-  }
-
   return (
-    <div className="space-y-3">
-      <div
-        onDragOver={(event) => {
-          event.preventDefault();
-          if (!busy) setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        className={`rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${
-          dragging ? "border-slate-500 bg-slate-50" : "border-slate-300"
-        }`}
-      >
-        <p className="text-sm font-medium text-slate-900">
-          Drop the whole class&apos;s homework here
-        </p>
-        <p className="mt-1 text-xs text-slate-500">
-          .docx, .pdf, or photos (.jpg, .png, .heic) · up to {MAX_BATCH_FILES}{" "}
-          files, 20MB each
-        </p>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-          className="mt-4 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-wait disabled:opacity-70"
-        >
-          Choose files
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={HOMEWORK_ACCEPT}
-          className="hidden"
-          onChange={(event) => {
-            const files = Array.from(event.target.files ?? []);
-            event.target.value = "";
-            void uploadBatch(files);
-          }}
-        />
-      </div>
-
+    <FileDropzone
+      title="Drop the whole class's homework here"
+      subtitle={`.docx, .pdf, or photos (.jpg, .png, .heic) · up to ${MAX_BATCH_FILES} files, 20MB each`}
+      accept={HOMEWORK_ACCEPT}
+      multiple
+      disabled={busy}
+      buttonLabel={busy ? "Uploading…" : "Choose files"}
+      onFiles={(files) => void uploadBatch(files)}
+    >
       {progress ? (
         <div className="space-y-2" aria-live="polite" aria-busy="true">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
@@ -182,6 +143,6 @@ export function BatchUploadDropzone({ assignmentId }: { assignmentId: string }) 
           </ul>
         </div>
       ) : null}
-    </div>
+    </FileDropzone>
   );
 }

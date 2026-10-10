@@ -1,0 +1,2 @@
+This is intentionally the wrong format for an answer key.
+Use it to confirm the app rejects .txt and lets you replace with a real .docx/.pdf.

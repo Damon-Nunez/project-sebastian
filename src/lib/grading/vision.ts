@@ -48,6 +48,15 @@ function getOcrWorker(): Promise<Worker> {
   return globalForOcr.ocrWorker;
 }
 
+/**
+ * OCR a JPEG for answer-key / exemplar text (no name masking).
+ * Empty string when OCR fails — caller decides whether to reject.
+ */
+export async function ocrJpegToText(jpeg: Buffer): Promise<string> {
+  const { text } = await ocrPage(jpeg);
+  return (text ?? "").trim();
+}
+
 /** Words + positions in the same pixel space as `jpeg`. Empty when OCR fails. */
 async function ocrPage(jpeg: Buffer): Promise<{ text: string; words: OcrWord[] }> {
   try {

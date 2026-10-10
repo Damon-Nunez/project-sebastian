@@ -88,7 +88,7 @@ export async function createStudentWorkUploadTarget(input: {
   return { storagePath, token: data.token };
 }
 
-async function normalizeHomeworkImage(
+export async function normalizeHomeworkImage(
   bytes: Buffer,
   format: HomeworkFormat,
 ): Promise<Buffer> {
@@ -308,8 +308,8 @@ export async function finalizeStudentWorkUpload(input: {
 }
 
 /**
- * Extract text from a .docx / .pdf the browser already put in Storage
- * (assignment answer keys / exemplars). Photos are rejected until vision (2.6).
+ * Extract text from a .docx / .pdf / photo the browser already put in Storage
+ * (assignment answer keys / exemplars). Photos are OCR'd locally (no AI).
  * The stored file is removed if it can't be used.
  */
 export async function extractStoredDocumentText(input: {
@@ -318,11 +318,10 @@ export async function extractStoredDocumentText(input: {
   filename: string;
 }): Promise<string> {
   const format = parseTeacherStoragePath(input.teacherId, input.storagePath);
-  if (!format || isImageFormat(format)) {
-    await removeStoredStudentWork(format ? [input.storagePath] : []);
+  if (!format) {
     throw new UnsupportedFrameworkFormatError(
       input.filename,
-      "Upload the answer key or example as a .docx or .pdf, or paste the text.",
+      "Upload the answer key or example as a .docx, .pdf, or photo (.jpg, .png, .heic), or paste the text.",
     );
   }
 
@@ -338,13 +337,204 @@ export async function extractStoredDocumentText(input: {
 
   try {
     const bytes = Buffer.from(await blob.arrayBuffer());
+    if (isImageFormat(format)) {
+      const { ocrJpegToText } = await import("./vision");
+      const jpeg = await normalizeHomeworkImage(bytes, format);
+      // Prefer a normalized JPEG path so replace/clear cleanup stays simple.
+      const jpegPath = jpegPathFor(input.storagePath);
+      if (jpegPath !== input.storagePath) {
+        const { error: upError } = await admin.storage
+          .from(STUDENT_WORK_BUCKET)
+          .upload(jpegPath, jpeg, { contentType: "image/jpeg", upsert: true });
+        if (upError) {
+          throw new Error(`Failed to store answer-key photo: ${upError.message}`);
+        }
+        await admin.storage.from(STUDENT_WORK_BUCKET).remove([input.storagePath]);
+      } else {
+        await admin.storage
+          .from(STUDENT_WORK_BUCKET)
+          .upload(jpegPath, jpeg, { contentType: "image/jpeg", upsert: true });
+      }
+      const text = await ocrJpegToText(jpeg);
+      if (!text) {
+        // EmptyHomeworkTextError only accepts framework formats; action maps instanceof → reference_file_empty.
+        throw new EmptyFrameworkTextError("pdf");
+      }
+      return text;
+    }
     return format === "docx"
       ? await extractDocxMarkedText(bytes)
       : await extractPdfText(bytes);
   } catch (extractError) {
-    await removeStoredStudentWork([input.storagePath]);
+    await removeStoredStudentWork([input.storagePath, jpegPathFor(input.storagePath)]);
     throw extractError;
   }
+}
+
+const MAX_REFERENCE_AI_EDGE_PX = 1568;
+
+export type IngestedReference = {
+  text: string;
+  storagePath: string;
+  filename: string;
+  pages: Array<{ storagePath: string; filename: string }>;
+  /** vision = Claude structured the photo key; extract = docx/pdf text. */
+  source: "vision" | "extract";
+};
+
+/**
+ * Ingest one or more stored reference files. Photo keys are kept as pages and
+ * structured by Claude vision (not local OCR). .docx/.pdf use text extraction.
+ */
+export async function ingestAssignmentReferenceFiles(input: {
+  teacherId: string;
+  files: Array<{ storagePath: string; filename: string }>;
+}): Promise<IngestedReference> {
+  if (input.files.length === 0) {
+    throw new UnsupportedFrameworkFormatError(
+      "reference",
+      "Upload the answer key or example as a .docx, .pdf, or photo (.jpg, .png, .heic), or paste the text.",
+    );
+  }
+
+  const admin = createAdminSupabaseClient();
+  const prepared: Array<{
+    storagePath: string;
+    filename: string;
+    format: HomeworkFormat;
+    jpeg?: Buffer;
+  }> = [];
+
+  for (const file of input.files) {
+    const format = parseTeacherStoragePath(input.teacherId, file.storagePath);
+    if (!format) {
+      await removeStoredStudentWork([file.storagePath]);
+      throw new UnsupportedFrameworkFormatError(
+        file.filename,
+        "Upload the answer key or example as a .docx, .pdf, or photo (.jpg, .png, .heic), or paste the text.",
+      );
+    }
+
+    const { data: blob, error } = await admin.storage
+      .from(STUDENT_WORK_BUCKET)
+      .download(file.storagePath);
+    if (error || !blob) {
+      throw new Error(
+        `Uploaded file not found in storage: ${error?.message ?? "missing"}`,
+      );
+    }
+    const bytes = Buffer.from(await blob.arrayBuffer());
+
+    if (isImageFormat(format)) {
+      const jpeg = await normalizeHomeworkImage(bytes, format);
+      const jpegPath = jpegPathFor(file.storagePath);
+      const { error: upError } = await admin.storage
+        .from(STUDENT_WORK_BUCKET)
+        .upload(jpegPath, jpeg, { contentType: "image/jpeg", upsert: true });
+      if (upError) {
+        throw new Error(`Failed to store answer-key photo: ${upError.message}`);
+      }
+      if (jpegPath !== file.storagePath) {
+        await admin.storage.from(STUDENT_WORK_BUCKET).remove([file.storagePath]);
+      }
+      prepared.push({
+        storagePath: jpegPath,
+        filename: file.filename,
+        format: "jpeg",
+        jpeg,
+      });
+    } else {
+      prepared.push({
+        storagePath: file.storagePath,
+        filename: file.filename,
+        format,
+      });
+    }
+  }
+
+  const imagePages = prepared.filter((page) => page.jpeg);
+  const textPages = prepared.filter((page) => !page.jpeg);
+
+  let text: string;
+  let source: "vision" | "extract";
+
+  if (imagePages.length > 0) {
+    const { default: sharp } = await import("sharp");
+    const { parseAnswerKeyFromImages } = await import("./parseReferenceLlm");
+    const images = await Promise.all(
+      imagePages.map(async (page) => {
+        const resized = await sharp(page.jpeg!)
+          .resize({
+            width: MAX_REFERENCE_AI_EDGE_PX,
+            height: MAX_REFERENCE_AI_EDGE_PX,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+        return {
+          mediaType: "image/jpeg" as const,
+          base64: resized.toString("base64"),
+        };
+      }),
+    );
+    text = await parseAnswerKeyFromImages({
+      teacherId: input.teacherId,
+      images,
+    });
+    source = "vision";
+
+    // Optional docx/pdf dropped with photos — append extracted text after vision.
+    if (textPages.length > 0) {
+      const extras: string[] = [];
+      for (const page of textPages) {
+        extras.push(
+          await extractStoredDocumentText({
+            teacherId: input.teacherId,
+            storagePath: page.storagePath,
+            filename: page.filename,
+          }),
+        );
+      }
+      text = `${text}\n\n--- Added from uploaded documents ---\n${extras.join("\n\n")}`;
+    }
+  } else {
+    const parts: string[] = [];
+    for (const [index, page] of prepared.entries()) {
+      const pageText = await extractStoredDocumentText({
+        teacherId: input.teacherId,
+        storagePath: page.storagePath,
+        filename: page.filename,
+      });
+      parts.push(
+        prepared.length > 1
+          ? `--- Page ${index + 1} (${page.filename}) ---\n${pageText}`
+          : pageText,
+      );
+    }
+    text = parts.join("\n\n");
+    source = "extract";
+    if (!text.trim()) {
+      throw new EmptyFrameworkTextError("pdf");
+    }
+  }
+
+  const pages = prepared.map((page) => ({
+    storagePath: page.storagePath,
+    filename: page.filename,
+  }));
+  const filename =
+    pages.length === 1
+      ? pages[0]!.filename
+      : `${pages.length} pages (${pages[0]!.filename}…)`;
+
+  return {
+    text,
+    storagePath: pages[0]!.storagePath,
+    filename,
+    pages,
+    source,
+  };
 }
 
 /** Signed preview URLs keyed by storage path; missing paths are left out. */

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  decodeReferenceStoragePath,
+  encodeReferenceStoragePath,
   MAX_REFERENCE_CHARS,
   normalizeReferenceText,
   parseReferenceKind,
@@ -36,6 +38,29 @@ describe("normalizeReferenceText", () => {
     expect(normalizeReferenceText("\r\n1. B\r\n\r\n\r\n\r\n2. D  \n")).toBe(
       "1. B\n\n2. D",
     );
+  });
+});
+
+describe("encode/decodeReferenceStoragePath", () => {
+  it("keeps a single path as a plain string", () => {
+    expect(
+      encodeReferenceStoragePath([
+        { storagePath: "t/a.jpg", filename: "a.jpg" },
+      ]),
+    ).toBe("t/a.jpg");
+    expect(decodeReferenceStoragePath("t/a.jpg", "a.jpg")).toEqual([
+      { storagePath: "t/a.jpg", filename: "a.jpg" },
+    ]);
+  });
+
+  it("round-trips multiple pages as JSON", () => {
+    const pages = [
+      { storagePath: "t/a.jpg", filename: "a.jpg" },
+      { storagePath: "t/b.jpg", filename: "b.jpg" },
+    ];
+    const encoded = encodeReferenceStoragePath(pages);
+    expect(encoded?.startsWith("{")).toBe(true);
+    expect(decodeReferenceStoragePath(encoded)).toEqual(pages);
   });
 });
 

@@ -1,6 +1,14 @@
 "use client";
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { parseRubricPhotoAction, discardRubricPhotoUploadsAction } from "@/app/rubrics/photoActions";
+import { FileDropzone } from "@/components/FileDropzone";
+import { gradingErrorMessage } from "@/lib/grading/errors";
+import { uploadFileToStudentWork } from "@/lib/grading/uploadClient";
+import {
+  MAX_RUBRIC_PHOTO_PAGES,
+  RUBRIC_PHOTO_ACCEPT,
+} from "@/lib/rubrics/rubricPhotoDraft";
 import {
   emptyRubricCriteria,
   type RubricCategory,
@@ -82,6 +90,9 @@ export function RubricEditorForm({
   );
   const [pending, startTransition] = useTransition();
   const [showCategoryErrors, setShowCategoryErrors] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoStatus, setPhotoStatus] = useState<string | null>(null);
 
   const cellMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -166,6 +177,83 @@ export function RubricEditorForm({
     criteriaInput.value = JSON.stringify(criteria);
   }
 
+  async function fillFromPhotos(files: File[]) {
+    if (files.length === 0 || photoBusy || pending) return;
+    if (files.length > MAX_RUBRIC_PHOTO_PAGES) {
+      setPhotoError(
+        `That's too many pages at once (max ${MAX_RUBRIC_PHOTO_PAGES}).`,
+      );
+      setPhotoStatus(null);
+      return;
+    }
+    const unsupported = files.find(
+      (file) => !/\.(jpe?g|png|heic|heif|pdf)$/i.test(file.name),
+    );
+    if (unsupported) {
+      setPhotoError("Upload a photo or scan (.jpg, .png, .heic, or .pdf).");
+      setPhotoStatus(null);
+      return;
+    }
+
+    const hasDescriptors = criteria.cells.some((cell) => cell.description.trim());
+    if (
+      hasDescriptors &&
+      !window.confirm(
+        "Replace the categories and descriptors with what the photo shows? You can still edit before saving.",
+      )
+    ) {
+      return;
+    }
+
+    const sorted = [...files].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true }),
+    );
+
+    setPhotoBusy(true);
+    setPhotoError(null);
+    setPhotoStatus(
+      `Reading ${sorted.length} page${sorted.length === 1 ? "" : "s"}…`,
+    );
+    const uploaded: Array<{ storagePath: string; filename: string }> = [];
+    try {
+      for (const file of sorted) {
+        const result = await uploadFileToStudentWork(file);
+        if (!result.ok) {
+          await discardRubricPhotoUploadsAction(
+            uploaded.map((file) => file.storagePath),
+          );
+          setPhotoError(
+            gradingErrorMessage(result.code) ?? "Upload failed. Try again.",
+          );
+          setPhotoStatus(null);
+          return;
+        }
+        uploaded.push({ storagePath: result.storagePath, filename: file.name });
+      }
+
+      const parsed = await parseRubricPhotoAction({ files: uploaded });
+      if (!parsed.ok) {
+        setPhotoError(parsed.message);
+        setPhotoStatus(null);
+        return;
+      }
+      setCriteria(parsed.criteria);
+      if (parsed.name) setName(parsed.name);
+      setPhotoStatus(
+        "Filled from the photo. Review the boxes below, then save.",
+      );
+    } catch (error) {
+      console.error("Rubric photo fill failed", error);
+      await discardRubricPhotoUploadsAction(
+        uploaded.map((file) => file.storagePath),
+      ).catch(() => null);
+      setPhotoError("Couldn't read that rubric. Try a clearer photo, or type it in.");
+      setPhotoStatus(null);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   return (
     <form
       action={(formData) => {
@@ -183,6 +271,36 @@ export function RubricEditorForm({
         : null}
       <input type="hidden" name="name" defaultValue={name} />
       <input type="hidden" name="criteriaJson" defaultValue="" />
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Fill from a photo
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Drop a photo or scan of a paper rubric. The boxes below fill in for
+          you to review. Nothing is saved until you click {submitLabel}.
+        </p>
+        <div className="mt-4">
+          <FileDropzone
+            title="Rubric photo or scan"
+            subtitle="JPG, PNG, HEIC, or PDF. Up to 4 pages."
+            accept={RUBRIC_PHOTO_ACCEPT}
+            multiple
+            disabled={photoBusy || pending}
+            buttonLabel={photoBusy ? "Reading…" : "Choose photos"}
+            onFiles={(files) => void fillFromPhotos(files)}
+          >
+            {photoStatus ? (
+              <p className="text-sm text-slate-700">{photoStatus}</p>
+            ) : null}
+            {photoError ? (
+              <p className="text-sm text-red-700" role="alert">
+                {photoError}
+              </p>
+            ) : null}
+          </FileDropzone>
+        </div>
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Basics</h2>

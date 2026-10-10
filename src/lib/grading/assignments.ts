@@ -13,8 +13,15 @@ import {
   normalizeFolderLabel,
   type AssignmentFolderLabels,
 } from "@/lib/grading/labels";
+import {
+  decodeReferenceStoragePath,
+  encodeReferenceStoragePath,
+  type ReferencePageFile,
+} from "@/lib/grading/reference";
 import { deleteStoredStudentWorkFiles } from "@/lib/grading/upload";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+
+export type { ReferencePageFile };
 
 const ASSIGNMENT_SELECT =
   "id, teacher_id, assignment_type, title, module_label, unit_label, lesson_label, unit_id, reference_kind, reference_text, reference_filename, reference_storage_path, reference_updated_at, created_at, updated_at";
@@ -137,6 +144,7 @@ export async function setAssignmentReference(input: {
   text: string | null;
   filename?: string | null;
   storagePath?: string | null;
+  pages?: ReferencePageFile[] | null;
 }): Promise<AssignmentRow> {
   const existing = await getAssignmentForTeacher(input);
   if (!existing) {
@@ -144,13 +152,27 @@ export async function setAssignmentReference(input: {
   }
 
   const clearing = input.kind === "none";
-  const nextPath = clearing
-    ? null
-    : (input.storagePath ?? existing.reference_storage_path);
+  const replacingFiles = clearing || input.storagePath != null || input.pages != null;
+  const existingPages = decodeReferenceStoragePath(
+    existing.reference_storage_path,
+    existing.reference_filename ?? "reference",
+  );
+  const nextPages = clearing
+    ? []
+    : (input.pages ??
+      (input.storagePath
+        ? [
+            {
+              storagePath: input.storagePath,
+              filename: input.filename ?? existing.reference_filename ?? "reference",
+            },
+          ]
+        : existingPages));
+  const nextPath = clearing ? null : encodeReferenceStoragePath(nextPages);
   const nextFilename = clearing
     ? null
-    : input.storagePath
-      ? (input.filename ?? null)
+    : replacingFiles
+      ? (input.filename ?? nextPages[0]?.filename ?? null)
       : existing.reference_filename;
 
   const now = new Date().toISOString();
@@ -176,13 +198,15 @@ export async function setAssignmentReference(input: {
     );
   }
 
-  if (
-    existing.reference_storage_path &&
-    existing.reference_storage_path !== nextPath
-  ) {
-    await deleteStoredStudentWorkFiles([
-      { storage_path: existing.reference_storage_path },
-    ]);
+  if (replacingFiles) {
+    const oldPaths = new Set(existingPages.map((page) => page.storagePath));
+    const keep = new Set(nextPages.map((page) => page.storagePath));
+    const removed = [...oldPaths].filter((path) => !keep.has(path));
+    if (removed.length > 0) {
+      await deleteStoredStudentWorkFiles(
+        removed.map((storage_path) => ({ storage_path })),
+      );
+    }
   }
 
   return data as AssignmentRow;

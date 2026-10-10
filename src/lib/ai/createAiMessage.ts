@@ -10,6 +10,29 @@ export type CreateAiMessageOptions = {
   maxTokens?: number;
 };
 
+/** Teacher-owned images (answer keys) — not student work; no roster masking brand. */
+export type TeacherAssetImage = {
+  mediaType: "image/jpeg";
+  base64: string;
+};
+
+function visionUserContent(
+  prepared: PreparedAiText,
+  images: Array<{ mediaType: "image/jpeg"; base64: string }>,
+): Anthropic.Messages.ContentBlockParam[] {
+  return [
+    ...images.map((page) => ({
+      type: "image" as const,
+      source: {
+        type: "base64" as const,
+        media_type: page.mediaType,
+        data: page.base64,
+      },
+    })),
+    { type: "text" as const, text: prepared.sanitizedText },
+  ];
+}
+
 /**
  * Fail-closed AI entry point for student/teacher prompt text.
  *
@@ -50,17 +73,32 @@ export async function createAiVisionMessage(
     messages: [
       {
         role: "user",
-        content: [
-          ...pages.map((page) => ({
-            type: "image" as const,
-            source: {
-              type: "base64" as const,
-              media_type: page.mediaType,
-              data: page.base64,
-            },
-          })),
-          { type: "text" as const, text: prepared.sanitizedText },
-        ],
+        content: visionUserContent(prepared, pages),
+      },
+    ],
+  });
+}
+
+/**
+ * Vision for teacher assets (answer keys / exemplars). Do not use for student
+ * work — that must go through `createAiVisionMessage` + masked pages.
+ */
+export async function createAiTeacherVisionMessage(
+  teacherId: string,
+  prepared: PreparedAiText,
+  images: TeacherAssetImage[],
+  options: CreateAiMessageOptions = {},
+): Promise<Anthropic.Messages.Message> {
+  const client = getAiClient(teacherId);
+
+  return client.messages.create({
+    model: options.model ?? DEFAULT_AI_MODEL,
+    max_tokens: options.maxTokens ?? 1024,
+    ...(options.system ? { system: options.system } : {}),
+    messages: [
+      {
+        role: "user",
+        content: visionUserContent(prepared, images),
       },
     ],
   });

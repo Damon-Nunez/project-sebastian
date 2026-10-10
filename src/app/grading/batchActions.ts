@@ -16,6 +16,7 @@ import {
   type GradingErrorCode,
 } from "@/lib/grading/errors";
 import {
+  approveAllAwaitingInSession,
   decideVisionApproval,
   gradeSuggestion,
   listGradingQueueForAssignment,
@@ -276,6 +277,32 @@ export async function decideVisionApprovalAction(formData: FormData) {
     console.error("decideVisionApprovalAction failed", error);
   }
   if (!saved) {
+    redirect(gradingErrorRedirect(sessionPath, "approval_failed"));
+  }
+
+  revalidatePath(sessionPath);
+  redirect(sessionPath);
+}
+
+/** Approve every masked preview in this class, then the page starts grading them. */
+export async function approveAllVisionAction(formData: FormData) {
+  const teacher = await getCurrentTeacher();
+  const periodId = formString(formData, "periodId");
+  const sessionId = formString(formData, "sessionId");
+  const sessionPath =
+    periodId && sessionId ? `/grading/${periodId}/${sessionId}` : "/grading";
+
+  if (!sessionId) {
+    redirect(gradingErrorRedirect(sessionPath, "session_not_found"));
+  }
+
+  try {
+    await approveAllAwaitingInSession({
+      teacherId: teacher.id,
+      sessionId,
+    });
+  } catch (error) {
+    console.error("approveAllVisionAction failed", error);
     redirect(gradingErrorRedirect(sessionPath, "approval_failed"));
   }
 

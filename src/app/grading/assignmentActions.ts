@@ -21,12 +21,13 @@ import {
   normalizeFolderLabel,
 } from "@/lib/grading/labels";
 import {
+  MAX_REFERENCE_PHOTO_PAGES,
   parseReferenceKind,
   validateReferenceText,
 } from "@/lib/grading/reference";
 import {
   EmptyHomeworkTextError,
-  extractStoredDocumentText,
+  ingestAssignmentReferenceFiles,
   UnsupportedHomeworkFormatError,
 } from "@/lib/grading/upload";
 import { getUnitForTeacher } from "@/lib/units/units";
@@ -111,28 +112,52 @@ export async function deleteAssignmentAction(formData: FormData) {
 }
 
 /**
- * Save the assignment reference. Either a file already uploaded to Storage
- * (text is extracted server-side) or pasted/edited text. "none" clears it.
+ * Save the assignment reference. Files already in Storage are OCR'd / parsed
+ * server-side (supports multi-page photo keys). "none" clears it.
  */
 export async function saveAssignmentReferenceAction(input: {
   assignmentId: string;
   kind: string;
   text?: string;
+  /** Single-file upload (still supported). */
   storagePath?: string;
   filename?: string;
-}): Promise<{ ok: true } | { ok: false; code: GradingErrorCode }> {
+  /** Multi-page photo (or mixed) answer key — preferred when dropping several files. */
+  files?: Array<{ storagePath: string; filename: string }>;
+}): Promise<
+  | { ok: true; text: string | null; pageCount: number; source: "vision" | "extract" | "text" }
+  | { ok: false; code: GradingErrorCode }
+> {
   const teacher = await getCurrentTeacher();
   const assignmentId =
     typeof input?.assignmentId === "string" ? input.assignmentId : "";
   const kind = parseReferenceKind(input?.kind);
-  const storagePath =
-    typeof input?.storagePath === "string" ? input.storagePath : "";
-  const filename =
-    typeof input?.filename === "string" && input.filename
-      ? input.filename
-      : "reference";
+
+  const files = Array.isArray(input?.files)
+    ? input.files.filter(
+        (file) =>
+          file &&
+          typeof file.storagePath === "string" &&
+          file.storagePath &&
+          typeof file.filename === "string" &&
+          file.filename,
+      )
+    : input?.storagePath
+      ? [
+          {
+            storagePath: input.storagePath,
+            filename:
+              typeof input.filename === "string" && input.filename
+                ? input.filename
+                : "reference",
+          },
+        ]
+      : [];
 
   if (!assignmentId || !kind) return { ok: false, code: "reference_failed" };
+  if (files.length > MAX_REFERENCE_PHOTO_PAGES) {
+    return { ok: false, code: "reference_too_many_photos" };
+  }
 
   const assignment = await getAssignmentForTeacher({
     teacherId: teacher.id,
@@ -141,13 +166,22 @@ export async function saveAssignmentReferenceAction(input: {
   if (!assignment) return { ok: false, code: "assignment_not_found" };
 
   let rawText = typeof input?.text === "string" ? input.text : "";
-  if (kind !== "none" && storagePath) {
+  let storedPath: string | null = null;
+  let storedFilename: string | null = null;
+  let pages: Array<{ storagePath: string; filename: string }> | null = null;
+  let source: "vision" | "extract" | "text" = "text";
+
+  if (kind !== "none" && files.length > 0) {
     try {
-      rawText = await extractStoredDocumentText({
+      const ingested = await ingestAssignmentReferenceFiles({
         teacherId: teacher.id,
-        storagePath,
-        filename,
+        files,
       });
+      rawText = ingested.text;
+      storedPath = ingested.storagePath;
+      storedFilename = ingested.filename;
+      pages = ingested.pages;
+      source = ingested.source;
     } catch (error) {
       if (error instanceof UnsupportedHomeworkFormatError) {
         return { ok: false, code: "reference_file_invalid" };
@@ -155,7 +189,7 @@ export async function saveAssignmentReferenceAction(input: {
       if (error instanceof EmptyHomeworkTextError) {
         return { ok: false, code: "reference_file_empty" };
       }
-      console.error("saveAssignmentReferenceAction extract failed", error);
+      console.error("saveAssignmentReferenceAction ingest failed", error);
       return { ok: false, code: "reference_failed" };
     }
   }
@@ -169,8 +203,9 @@ export async function saveAssignmentReferenceAction(input: {
       assignmentId,
       kind,
       text: validated.text,
-      storagePath: kind !== "none" && storagePath ? storagePath : null,
-      filename: storagePath ? filename : null,
+      storagePath: kind !== "none" ? storedPath : null,
+      filename: kind !== "none" && storedPath ? storedFilename : null,
+      pages: kind === "none" ? null : pages,
     });
   } catch (error) {
     console.error("saveAssignmentReferenceAction failed", error);
@@ -179,5 +214,10 @@ export async function saveAssignmentReferenceAction(input: {
 
   revalidatePath(`/grading/assignments/${assignmentId}`);
   revalidatePath("/grading");
-  return { ok: true };
+  return {
+    ok: true,
+    text: validated.text,
+    pageCount: pages?.length ?? 0,
+    source,
+  };
 }

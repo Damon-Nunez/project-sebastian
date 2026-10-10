@@ -1,4 +1,6 @@
+import { deleteFiledPaperAction } from "@/app/grading/actions";
 import { decideVisionApprovalAction } from "@/app/grading/batchActions";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import type { RubricCriteria } from "@/lib/rubrics/criteria";
 import type { Verdict } from "@/lib/grading/gradeSchema";
 import { referenceKindLabel } from "@/lib/grading/reference";
@@ -68,6 +70,7 @@ export function GradeResultCard({
             )}
           </p>
         </div>
+        <div className="flex flex-col items-end gap-2">
         {graded ? (
           <div className="text-right">
             <p className="text-2xl font-semibold tracking-tight text-slate-900">
@@ -86,6 +89,21 @@ export function GradeResultCard({
               : "Not graded"}
           </span>
         )}
+          <form action={deleteFiledPaperAction}>
+            <input type="hidden" name="suggestionId" value={suggestion.id} />
+            <input type="hidden" name="periodId" value={periodId} />
+            <input
+              type="hidden"
+              name="sessionId"
+              value={suggestion.grading_session_id}
+            />
+            <ConfirmSubmitButton
+              label="Delete paper"
+              confirmMessage={`Remove ${paper.studentName}'s paper from this class? This cannot be undone.`}
+              className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+            />
+          </form>
+        </div>
       </div>
 
       {awaitingApproval ? (

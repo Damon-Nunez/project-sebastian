@@ -12,8 +12,51 @@ export const REFERENCE_KINDS: readonly ReferenceKind[] = [
 
 export const MAX_REFERENCE_CHARS = 50_000;
 
+/** Photo answer keys can be longer than a student paper (CamScanner multi-page). */
+export const MAX_REFERENCE_PHOTO_PAGES = 20;
+
+export type ReferencePageFile = { storagePath: string; filename: string };
+
+/** Encode one or many stored reference page paths into assignments.reference_storage_path. */
+export function encodeReferenceStoragePath(pages: ReferencePageFile[]): string | null {
+  if (pages.length === 0) return null;
+  if (pages.length === 1) return pages[0]!.storagePath;
+  return JSON.stringify({ v: 1, pages });
+}
+
+/** Decode legacy single path or multi-page JSON payload. */
+export function decodeReferenceStoragePath(
+  raw: string | null | undefined,
+  fallbackFilename = "reference",
+): ReferencePageFile[] {
+  if (!raw) return [];
+  if (raw.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(raw) as {
+        v?: number;
+        pages?: Array<{ storagePath?: string; filename?: string }>;
+      };
+      if (parsed.v === 1 && Array.isArray(parsed.pages)) {
+        return parsed.pages.flatMap((page) =>
+          page.storagePath
+            ? [
+                {
+                  storagePath: page.storagePath,
+                  filename: page.filename || fallbackFilename,
+                },
+              ]
+            : [],
+        );
+      }
+    } catch {
+      // fall through — treat as a plain storage path
+    }
+  }
+  return [{ storagePath: raw, filename: fallbackFilename }];
+}
+
 export const REFERENCE_FILE_ACCEPT =
-  ".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  ".docx,.pdf,.jpg,.jpeg,.png,.heic,.heif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/heic,image/heif";
 
 export function parseReferenceKind(raw: unknown): ReferenceKind | null {
   return REFERENCE_KINDS.includes(raw as ReferenceKind)

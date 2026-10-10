@@ -202,13 +202,30 @@ Shared infrastructure every teacher and every AI feature depends on.
 
 **Privacy**: Sanitized text / masked images only — no raw student PII in any AI payload (decision #8).
 
-### Ticket 11: Review, export & class summary
-- Edit grade + comments before marking final in app
-- Per-student: copy comment + clear grade display
-- Per-class table: all students, grades, comments — work through a section in one sitting
-- No Jupiter auto-submit (explicitly out of scope V1)
+### Ticket 11: Grading finish + must-have polish *(SCRUM-134)*
+- Class summary table (all students, grades, comments)
+- Copy grade + comment; edit; mark final (no Jupiter auto-submit)
+- Ticket 10 UX must-haves from testing (combine-first clarity, answer-key-first + auto-save, replace bad key, shared dropzone chrome)
+- Curated essay / multi-upload bug battery (feeds Gate A)
 
-**Phase 1B exit criteria**: Teacher can grade a batch of work with ranges, accommodation visibility, and efficient copy-out to Jupiter.
+**Still to do (from Ticket 11 testing):**
+- [x] **Rubric photo upload + AI parse** — drop a paper rubric photo/scan; AI fills the editor; teacher reviews before save *(2.5 / SCRUM-153)*
+- [x] **Period rubric updating** — period override uses the same editor, including photo fill *(2.6 / SCRUM-154)*
+- [x] **Approve all + grade** — one class control approves masked previews, then grading starts *(2.7 / SCRUM-155)*
+- [x] **Delete any filed paper** — class summary and paper card; faulty or failed submissions *(2.8 / SCRUM-156)*
+- [ ] **Battery retest** — vision grade JSON parse + sanitizer single-letter alias `A` (fixes are in local tests; confirm on a CamScanner multi-page run) *(2.9 / SCRUM-157, parent SCRUM-142)*
+
+### Ticket 12: First-login setup *(SCRUM-135)*
+- Wizard/checklist: periods + roster, rubrics, subject + grade band + display defaults
+- Setup-complete gate → enter app (resume-safe; skip if already done)
+- **Pilot AI stays Option B** (app key on Vercel) — teacher Claude MCP / BYOK is post-MVP
+
+### Ship English MVP epic *(SCRUM-133)* — after Tickets 11–12
+- **UI pass** *(SCRUM-136)*: one intentional visual pass (shell + grading + lesson/setup)
+- **Ops** *(SCRUM-137)*: Vercel live with env + migrations
+- **Gate A + Gate B** *(SCRUM-138)*: essay/upload suite signed off + mom E2E approval
+
+**Phase 1B / English MVP exit criteria**: Teacher can set up, grade a batch with ranges + accommodation visibility, copy out to Jupiter, use a presentable UI on a live URL, and the pilot user (mom) approves.
 
 ---
 
@@ -338,6 +355,8 @@ Ticket 6 →  Google Drive
 Ticket 7 →  lesson planning flow  ──► SHIP 1A
 Ticket 8 →  rubric/unit setup
 Ticket 9 →  doc upload + matcher
-Ticket 10 → grading AI
-Ticket 11 → export + class summary  ──► SHIP MVP
+Ticket 10 → grading AI (answer key, batch, text + vision)
+Ticket 11 → grading finish + must-have polish (SCRUM-134)
+Ticket 12 → first-login setup (SCRUM-135)
+UI pass + Vercel + Gates A/B (SCRUM-133 epic)  ──► SHIP English MVP
 ```

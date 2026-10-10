@@ -1,4 +1,4 @@
-import { aliasPatternBody, normalizePersonName } from "./names";
+import { aliasPatternBody, isUsableAlias, normalizePersonName, STU_TOKEN_RE } from "./names";
 import type { NameTokenMap } from "./types";
 
 /** Thrown when sanitized text still contains roster name aliases. */
@@ -23,6 +23,8 @@ export function findRemainingRosterAliases(
   text: string,
   map: NameTokenMap,
 ): string[] {
+  // Ignore placeholders — UUID hex (a–f) must not look like name aliases.
+  const haystack = text.replace(STU_TOKEN_RE, " ");
   const found: string[] = [];
   const aliases = [
     ...map.entries.flatMap((entry) => entry.aliases),
@@ -30,12 +32,13 @@ export function findRemainingRosterAliases(
   ];
 
   for (const alias of aliases) {
+    if (!isUsableAlias(alias)) continue;
     const normalized = normalizePersonName(alias);
     const body = aliasPatternBody(normalized);
     if (!body) continue;
 
     const pattern = new RegExp(`(?<![\\p{L}])${body}(?![\\p{L}])`, "giu");
-    if (pattern.test(text)) {
+    if (pattern.test(haystack)) {
       found.push(normalized);
     }
   }

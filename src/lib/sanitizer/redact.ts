@@ -1,7 +1,9 @@
 import {
   aliasPatternBody,
   fullNameOrderVariants,
+  isUsableAlias,
   normalizePersonName,
+  STU_TOKEN_RE,
 } from "./names";
 import { assertSanitizedForAi } from "./verify";
 import type { NameTokenEntry, NameTokenMap, RosterStudent } from "./types";
@@ -23,6 +25,28 @@ function splitName(fullName: string): { first: string; last: string | null } {
 }
 
 /**
+ * Replace only outside existing [[STU_…]] tokens so later aliases can't eat
+ * hex letters inside student-id placeholders (e.g. alias "Be" vs uuid "…be…").
+ */
+function replaceOutsideStuTokens(
+  text: string,
+  pattern: RegExp,
+  replacement: string,
+): string {
+  const tokenRe = new RegExp(STU_TOKEN_RE.source, STU_TOKEN_RE.flags);
+  const chunks: string[] = [];
+  let last = 0;
+  for (const match of text.matchAll(tokenRe)) {
+    const start = match.index ?? 0;
+    chunks.push(text.slice(last, start).replace(pattern, replacement));
+    chunks.push(match[0]!);
+    last = start + match[0]!.length;
+  }
+  chunks.push(text.slice(last).replace(pattern, replacement));
+  return chunks.join("");
+}
+
+/**
  * V1 edge-case policy for which strings feed the redact map:
  * - Always: full roster name + Last/First order variants (shared with match)
  * - First name: only if unique across the roster (case-insensitive)
@@ -30,6 +54,7 @@ function splitName(fullName: string): { first: string; last: string | null } {
  * - Nickname: only if unique among nicknames AND does not collide with another
  *   student's first/last (no invented dictionary)
  * - Duplicate full names: first student id (lexicographic) owns that alias
+ * - Aliases shorter than MIN_ALIAS_CHARS are skipped (MC "A", UUID hex)
  * Shared parts left out here are still redacted, to SHARED_NAME_TOKEN.
  */
 export function aliasesForRoster(roster: RosterStudent[]): Map<string, string[]> {
@@ -67,16 +92,30 @@ export function aliasesForRoster(roster: RosterStudent[]): Map<string, string[]>
   const byId = new Map<string, string[]>();
 
   for (const row of cleaned) {
-    const aliases = new Set<string>(fullNameOrderVariants(row.name));
+    const aliases = new Set<string>(
+      fullNameOrderVariants(row.name).filter(isUsableAlias),
+    );
     const { first, last } = splitName(row.name);
 
-    if (first && (firstCounts.get(first.toLowerCase()) ?? 0) === 1) {
+    if (
+      first &&
+      isUsableAlias(first) &&
+      (firstCounts.get(first.toLowerCase()) ?? 0) === 1
+    ) {
       aliases.add(first);
     }
-    if (last && (lastCounts.get(last.toLowerCase()) ?? 0) === 1) {
+    if (
+      last &&
+      isUsableAlias(last) &&
+      (lastCounts.get(last.toLowerCase()) ?? 0) === 1
+    ) {
       aliases.add(last);
     }
-    if (row.nickname && (nicknameCounts.get(row.nickname.toLowerCase()) ?? 0) === 1) {
+    if (
+      row.nickname &&
+      isUsableAlias(row.nickname) &&
+      (nicknameCounts.get(row.nickname.toLowerCase()) ?? 0) === 1
+    ) {
       const nickKey = row.nickname.toLowerCase();
       const collidesWithOtherName = cleaned.some((other) => {
         if (other.id === row.id) return false;
@@ -117,7 +156,7 @@ export function buildNameTokenMap(roster: RosterStudent[]): NameTokenMap {
     studentId: row.id,
     name: row.name,
     token: tokenForStudentId(row.id),
-    aliases: aliasById.get(row.id) ?? [row.name],
+    aliases: aliasById.get(row.id) ?? [row.name].filter(isUsableAlias),
   }));
 
   const owned = new Set(
@@ -127,7 +166,7 @@ export function buildNameTokenMap(roster: RosterStudent[]): NameTokenMap {
   for (const row of cleaned) {
     const { first, last } = splitName(row.name);
     for (const part of [first, last, row.nickname]) {
-      if (part && !owned.has(part.toLowerCase())) {
+      if (part && isUsableAlias(part) && !owned.has(part.toLowerCase())) {
         shared.set(part.toLowerCase(), part);
       }
     }
@@ -148,6 +187,7 @@ function replacePlan(map: NameTokenMap): AliasHit[] {
 
   for (const entry of map.entries) {
     for (const alias of entry.aliases) {
+      if (!isUsableAlias(alias)) continue;
       const key = normalizePersonName(alias).toLowerCase();
       const existing = byAlias.get(key);
       if (!existing || entry.studentId.localeCompare(existing.studentId) < 0) {
@@ -176,14 +216,16 @@ export function redact(text: string, map: NameTokenMap): string {
 
   const plan = [
     ...replacePlan(map),
-    ...map.sharedAliases.map((alias) => ({ alias, token: SHARED_NAME_TOKEN })),
+    ...map.sharedAliases
+      .filter(isUsableAlias)
+      .map((alias) => ({ alias, token: SHARED_NAME_TOKEN })),
   ];
   for (const hit of plan) {
     const body = aliasPatternBody(hit.alias);
     if (!body) continue;
 
     const pattern = new RegExp(`(?<![\\p{L}])${body}(?![\\p{L}])`, "giu");
-    result = result.replace(pattern, hit.token);
+    result = replaceOutsideStuTokens(result, pattern, hit.token);
   }
 
   return result;

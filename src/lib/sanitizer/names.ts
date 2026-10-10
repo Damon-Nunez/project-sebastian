@@ -1,5 +1,14 @@
 /** Shared name normalization + variants for match and redact. */
 
+/**
+ * Single-letter aliases ("A", "J") collide with MC options and with hex
+ * digits inside [[STU_<uuid>]] tokens. Full names can still be short words (Ed).
+ */
+export const MIN_ALIAS_CHARS = 2;
+
+/** Placeholder regions inserted by redact — never scan/replace inside these. */
+export const STU_TOKEN_RE = /\[\[STU_[^\]]+\]\]/gi;
+
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -10,6 +19,10 @@ export function normalizePersonName(name: string): string {
     .replace(/\u00A0/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+export function isUsableAlias(alias: string): boolean {
+  return normalizePersonName(alias).length >= MIN_ALIAS_CHARS;
 }
 
 /**

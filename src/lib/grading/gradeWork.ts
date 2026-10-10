@@ -69,6 +69,14 @@ The student's work is in the attached page images (photos or scans of paper), in
 - If two options are marked, the mark is too faint to see, or the handwriting cannot be read, the verdict is "unreadable" — never guess.
 - studentAnswer: transcribe what you can read; write "[illegible]" for parts you cannot.`;
 
+/** Appended only on retry — keeps attempt 1 cheap. */
+const JSON_RETRY_RULES = `
+
+CRITICAL: Your previous reply was not valid JSON. Reply with ONLY one JSON object matching the shape above.
+- Escape every double quote inside string values as \\"
+- No trailing commas
+- No markdown fences, no commentary before or after the object`;
+
 export type GradeDetail = {
   version: 1;
   mode: ComputedGrade["mode"];
@@ -216,14 +224,18 @@ export async function askForGrade(input: {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
+      const system =
+        SYSTEM_PROMPT +
+        (input.pages?.length ? VISION_RULES : "") +
+        (attempt > 1 ? JSON_RETRY_RULES : "");
       const message = input.pages?.length
         ? await createAiVisionMessage(input.teacherId, prepared, input.pages, {
-            system: SYSTEM_PROMPT + VISION_RULES,
+            system,
             model: DEFAULT_AI_MODEL,
             maxTokens: 4096,
           })
         : await createAiMessage(input.teacherId, prepared, {
-            system: SYSTEM_PROMPT,
+            system,
             model: DEFAULT_AI_MODEL,
             maxTokens: 4096,
           });
@@ -427,6 +439,27 @@ export async function decideVisionApproval(input: {
     throw new Error(`Failed to save approval: ${error.message}`);
   }
   return data !== null;
+}
+
+/** Approve every masked preview still waiting in this class, then grading can start. */
+export async function approveAllAwaitingInSession(input: {
+  teacherId: string;
+  sessionId: string;
+}): Promise<number> {
+  const { data, error } = await createAdminSupabaseClient()
+    .from("grading_suggestions")
+    .update({
+      ai_status: "pending",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("teacher_id", input.teacherId)
+    .eq("grading_session_id", input.sessionId)
+    .eq("ai_status", "awaiting_approval")
+    .select("id");
+  if (error) {
+    throw new Error(`Failed to approve papers: ${error.message}`);
+  }
+  return data?.length ?? 0;
 }
 
 /** Put failed papers back in the queue. */

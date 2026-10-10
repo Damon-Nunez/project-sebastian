@@ -17,6 +17,7 @@
     "@tesseract.js-data/eng": "^1.0.0",
     "docx": "^9.7.1",
     "heic-convert": "^2.1.0",
+    "jsonrepair": "^3.15.0",
     "mammoth": "^1.12.2",
     "next": "16.3.4",
     "pdf-parse": "^2.4.5",

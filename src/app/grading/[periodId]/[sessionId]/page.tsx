@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { approveAllVisionAction } from "@/app/grading/batchActions";
+import { ClassSummaryTable } from "@/components/ClassSummaryTable";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { DeleteAssignmentFolderButton } from "@/components/DeleteAssignmentFolderButton";
 import { GradeResultCard } from "@/components/GradeResultCard";
 import { GradingRunner } from "@/components/GradingRunner";
@@ -7,13 +10,17 @@ import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
 import { getAssignmentForTeacher } from "@/lib/grading/assignments";
 import { gradingErrorMessage } from "@/lib/grading/errors";
 import { listGradingQueueForAssignment, loadRubric } from "@/lib/grading/gradeWork";
-import { listSessionPapers } from "@/lib/grading/results";
+import {
+  buildClassSummaryRows,
+  listSessionPapers,
+} from "@/lib/grading/results";
 import {
   getGradingSessionForTeacher,
   sessionFolderTitle,
 } from "@/lib/grading/sessions";
 import { createSignedStudentWorkUrls } from "@/lib/grading/upload";
 import { getPeriodForTeacher } from "@/lib/roster/periods";
+import { listStudentsForPeriod } from "@/lib/roster/students";
 import { safeParseRubricCriteria } from "@/lib/rubrics/criteria";
 
 type SessionPageProps = {
@@ -38,8 +45,9 @@ export default async function GradingSessionPage({
     notFound();
   }
 
-  const [papers, assignment, rubric] = await Promise.all([
+  const [papers, students, assignment, rubric] = await Promise.all([
     listSessionPapers({ teacherId: teacher.id, sessionId }),
+    listStudentsForPeriod({ teacherId: teacher.id, periodId }),
     session.assignment_id
       ? getAssignmentForTeacher({
           teacherId: teacher.id,
@@ -48,6 +56,7 @@ export default async function GradingSessionPage({
       : null,
     loadRubric(teacher.id, session.rubric_id),
   ]);
+  const summaryRows = buildClassSummaryRows({ students, papers });
   const parsedCriteria = rubric ? safeParseRubricCriteria(rubric.criteria) : null;
   const criteria = parsedCriteria?.success ? parsedCriteria.data : null;
   const previewUrls = await createSignedStudentWorkUrls(
@@ -67,6 +76,9 @@ export default async function GradingSessionPage({
     : null;
 
   const title = sessionFolderTitle(session);
+  const awaitingApprovalCount = papers.filter(
+    (paper) => paper.suggestion.ai_status === "awaiting_approval",
+  ).length;
 
   return (
     <section className="space-y-6">
@@ -150,6 +162,32 @@ export default async function GradingSessionPage({
         </p>
       ) : null}
 
+      <ClassSummaryTable
+        rows={summaryRows}
+        periodId={periodId}
+        sessionId={sessionId}
+      />
+
+      {awaitingApprovalCount > 0 ? (
+        <form
+          action={approveAllVisionAction}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 p-5 shadow-sm"
+        >
+          <p className="text-sm text-violet-950">
+            {awaitingApprovalCount}{" "}
+            {awaitingApprovalCount === 1 ? "paper is" : "papers are"} waiting
+            on a masked preview. Approving sends them to grading.
+          </p>
+          <input type="hidden" name="periodId" value={periodId} />
+          <input type="hidden" name="sessionId" value={sessionId} />
+          <ConfirmSubmitButton
+            label={`Approve all and grade (${awaitingApprovalCount})`}
+            confirmMessage={`Approve ${awaitingApprovalCount} masked preview${awaitingApprovalCount === 1 ? "" : "s"} and start grading? Look over the previews first if you have not already.`}
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          />
+        </form>
+      ) : null}
+
       {assignment && gradingQueue ? (
         <GradingRunner
           assignmentId={assignment.id}
@@ -160,7 +198,8 @@ export default async function GradingSessionPage({
 
       {papers.length === 0 ? (
         <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-          No papers filed in this folder yet.
+          No papers filed in this folder yet. Missing students are listed in the
+          class summary above.
         </p>
       ) : (
         <ul className="space-y-4">

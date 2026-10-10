@@ -6,6 +6,7 @@ import {
   getAssignmentForTeacher,
   listPeriodFoldersForAssignment,
 } from "@/lib/grading/assignments";
+import { decodeReferenceStoragePath } from "@/lib/grading/reference";
 import { deleteGradingSessionForTeacher } from "@/lib/grading/sessions";
 import {
   deleteStoredStudentWorkFiles,
@@ -60,9 +61,13 @@ export async function deleteAssignmentForTeacher(input: {
     throw new Error(`Failed to delete assignment: ${error.message}`);
   }
 
-  if (existing.reference_storage_path) {
-    await deleteStoredStudentWorkFiles([
-      { storage_path: existing.reference_storage_path },
-    ]);
+  const referencePaths = decodeReferenceStoragePath(
+    existing.reference_storage_path,
+    existing.reference_filename ?? "reference",
+  ).map((page) => page.storagePath);
+  if (referencePaths.length > 0) {
+    await deleteStoredStudentWorkFiles(
+      [...new Set(referencePaths)].map((storage_path) => ({ storage_path })),
+    );
   }
 }
