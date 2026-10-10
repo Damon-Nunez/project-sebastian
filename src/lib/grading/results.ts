@@ -2,12 +2,14 @@
  * Read side of AI grading for the folder page (Ticket 10 / SCRUM-131).
  */
 import type { AiGradingStatus, GradingSuggestionRow } from "@/lib/db/types";
+import type { RubricCriteria } from "@/lib/rubrics/criteria";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import {
   defaultCommentForSuggestion,
   defaultGradeForSuggestion,
 } from "./finalize";
 import { SUGGESTION_SELECT } from "./fileHomework";
+import type { Verdict } from "./gradeSchema";
 import type { GradeDetail } from "./gradeWork";
 import { parseVisionPages, type VisionPage } from "./studentWorkFiles";
 
@@ -38,6 +40,83 @@ export function parseGradeDetail(raw: unknown): GradeDetail | null {
 /** Answer quotes keep [[hl]]-style markers from extraction; drop them for display. */
 export function stripAnswerMarkers(text: string): string {
   return text.replace(/\[\[\/?(hl|b|u|s)\]\]/g, "");
+}
+
+export const VERDICT_LABELS: Record<Verdict, string> = {
+  correct: "Correct",
+  partial: "½ credit",
+  incorrect: "Incorrect",
+  unanswered: "Unanswered",
+  unreadable: "Can't tell",
+};
+
+function formatPoints(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+function levelLabel(criteria: RubricCriteria | null, level: number): string {
+  return (
+    criteria?.levels.find((entry) => entry.score === level)?.label ||
+    `Level ${level}`
+  );
+}
+
+function categoryName(criteria: RubricCriteria | null, id: string): string {
+  return criteria?.categories.find((entry) => entry.id === id)?.name ?? id;
+}
+
+/**
+ * Plain text of the "Why this range" breakdown, matching what the paper card shows.
+ */
+export function formatWhyThisRange(
+  detail: GradeDetail,
+  criteria: RubricCriteria | null,
+): string {
+  const blocks: string[] = [];
+
+  for (const item of detail.items) {
+    const bits = [`Q${item.label}`];
+    if (item.kind === "key" && item.verdict) {
+      bits.push(VERDICT_LABELS[item.verdict]);
+    } else if (item.rubricLevel !== null) {
+      bits.push(
+        `Rubric ${item.rubricLevel} · ${levelLabel(criteria, item.rubricLevel)}`,
+      );
+    }
+    if (item.maxPoints !== null) {
+      bits.push(`${formatPoints(item.maxPoints)} pts`);
+    }
+
+    const lines = [bits.join(" · "), item.reason];
+    if (item.studentAnswer) {
+      const student = `Student: “${stripAnswerMarkers(item.studentAnswer)}”`;
+      const key = item.expectedAnswer
+        ? ` · Key: “${stripAnswerMarkers(item.expectedAnswer)}”`
+        : "";
+      lines.push(student + key);
+    }
+    blocks.push(lines.join("\n"));
+  }
+
+  if (detail.categoryScores.length > 0) {
+    blocks.push(
+      detail.categoryScores
+        .map((score) => {
+          const name = categoryName(criteria, score.categoryId);
+          const label = levelLabel(criteria, score.level);
+          return `${name} — ${score.level} · ${label}. ${score.reason}`;
+        })
+        .join("\n"),
+    );
+  }
+
+  blocks.push(
+    detail.mode === "points"
+      ? "Points come from the answer key; ½ credit is noted per question. Range is the score ±2."
+      : "No points on the key, so the rubric levels above set the grade. Range is the score ±2.",
+  );
+
+  return blocks.join("\n\n");
 }
 
 /** True when the key was replaced after this paper was graded. */

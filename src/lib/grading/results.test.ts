@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { GradingSuggestionRow } from "@/lib/db/types";
+import type { RubricCriteria } from "@/lib/rubrics/criteria";
+import type { GradeDetail } from "./gradeWork";
 import {
   buildClassSummaryRows,
+  formatWhyThisRange,
   gradedAgainstOlderKey,
   parseGradeDetail,
   stripAnswerMarkers,
@@ -64,6 +67,100 @@ describe("stripAnswerMarkers", () => {
   it("removes formatting markers but keeps the words", () => {
     expect(stripAnswerMarkers("B) [[hl]]ashamed[[/hl]] [[s]]C)[[/s]]")).toBe(
       "B) ashamed C)",
+    );
+  });
+});
+
+const criteria = {
+  version: 1,
+  scale: { min: 1, max: 4, percentMin: null, percentMax: null },
+  levels: [
+    { id: "meets", score: 3, label: "Meets" },
+    { id: "blank", score: 2, label: "" },
+  ],
+  categories: [{ id: "ideas", name: "Ideas", weight: null }],
+  cells: [],
+} satisfies RubricCriteria;
+
+function gradeDetail(
+  partial: Partial<GradeDetail> & Pick<GradeDetail, "mode">,
+): GradeDetail {
+  return {
+    version: 1,
+    percent: 85,
+    earnedPoints: null,
+    totalPoints: null,
+    referenceKind: "answer_key",
+    items: [],
+    categoryScores: [],
+    accommodationNote: null,
+    model: "test",
+    ...partial,
+  };
+}
+
+describe("formatWhyThisRange", () => {
+  it("copies question verdicts, rubric names, and the points note", () => {
+    const text = formatWhyThisRange(
+      gradeDetail({
+        mode: "points",
+        earnedPoints: 2.5,
+        totalPoints: 4,
+        items: [
+          {
+            label: "1",
+            kind: "key",
+            studentAnswer: "[[hl]]ashamed[[/hl]]",
+            expectedAnswer: "ashamed",
+            verdict: "partial",
+            rubricLevel: null,
+            maxPoints: 2.5,
+            reason: "Named the feeling but missed the cause.",
+          },
+          {
+            label: "2",
+            kind: "rubric",
+            studentAnswer: "",
+            expectedAnswer: null,
+            verdict: null,
+            rubricLevel: 3,
+            maxPoints: null,
+            reason: "Clear claim with one example.",
+          },
+        ],
+        categoryScores: [
+          { categoryId: "ideas", level: 3, reason: "Focused on the prompt." },
+          { categoryId: "unknown", level: 2, reason: "Thin evidence." },
+        ],
+      }),
+      criteria,
+    );
+
+    expect(text).toBe(
+      [
+        "Q1 · ½ credit · 2.5 pts",
+        "Named the feeling but missed the cause.",
+        "Student: “ashamed” · Key: “ashamed”",
+        "",
+        "Q2 · Rubric 3 · Meets",
+        "Clear claim with one example.",
+        "",
+        "Ideas — 3 · Meets. Focused on the prompt.",
+        "unknown — 2 · Level 2. Thin evidence.",
+        "",
+        "Points come from the answer key; ½ credit is noted per question. Range is the score ±2.",
+      ].join("\n"),
+    );
+  });
+
+  it("uses the rubric note when the key has no points", () => {
+    const text = formatWhyThisRange(
+      gradeDetail({ mode: "rubric", referenceKind: "none" }),
+      null,
+    );
+
+    expect(text).toBe(
+      "No points on the key, so the rubric levels above set the grade. Range is the score ±2.",
     );
   });
 });

@@ -1,23 +1,29 @@
 import { deleteFiledPaperAction } from "@/app/grading/actions";
 import { decideVisionApprovalAction } from "@/app/grading/batchActions";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { CopyTextButton } from "@/components/CopyTextButton";
 import type { RubricCriteria } from "@/lib/rubrics/criteria";
 import type { Verdict } from "@/lib/grading/gradeSchema";
 import { referenceKindLabel } from "@/lib/grading/reference";
 import {
   AI_STATUS_LABELS,
+  formatWhyThisRange,
   gradedAgainstOlderKey,
   stripAnswerMarkers,
+  VERDICT_LABELS,
   type SessionPaper,
 } from "@/lib/grading/results";
 
-const VERDICT_STYLES: Record<Verdict, { label: string; className: string }> = {
-  correct: { label: "Correct", className: "bg-emerald-100 text-emerald-900" },
-  partial: { label: "½ credit", className: "bg-amber-100 text-amber-900" },
-  incorrect: { label: "Incorrect", className: "bg-red-100 text-red-900" },
-  unanswered: { label: "Unanswered", className: "bg-slate-100 text-slate-700" },
-  unreadable: { label: "Can't tell", className: "bg-violet-100 text-violet-900" },
+const VERDICT_STYLES: Record<Verdict, string> = {
+  correct: "bg-emerald-100 text-emerald-900",
+  partial: "bg-amber-100 text-amber-900",
+  incorrect: "bg-red-100 text-red-900",
+  unanswered: "bg-slate-100 text-slate-700",
+  unreadable: "bg-violet-100 text-violet-900",
 };
+
+const copyBtnClass =
+  "shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
 
 const badge = "rounded-full px-2.5 py-0.5 text-xs font-medium";
 
@@ -49,6 +55,7 @@ export function GradeResultCard({
     criteria?.levels.find((l) => l.score === level)?.label || `Level ${level}`;
   const categoryName = (id: string) =>
     criteria?.categories.find((c) => c.id === id)?.name ?? id;
+  const whyThisRange = detail ? formatWhyThisRange(detail, criteria) : "";
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -195,10 +202,11 @@ export function GradeResultCard({
             </p>
           ) : null}
 
-          <details className="mt-3 text-sm">
-            <summary className="cursor-pointer font-medium text-slate-800">
-              Why this range
-            </summary>
+          <div className="mt-3 flex items-start gap-2">
+            <details className="min-w-0 flex-1 text-sm">
+              <summary className="cursor-pointer font-medium text-slate-800">
+                Why this range
+              </summary>
             {detail.items.length > 0 ? (
               <ul className="mt-3 divide-y divide-slate-100">
                 {detail.items.map((item, index) => (
@@ -208,8 +216,8 @@ export function GradeResultCard({
                         Q{item.label}
                       </span>
                       {item.kind === "key" && item.verdict ? (
-                        <span className={`${badge} ${VERDICT_STYLES[item.verdict].className}`}>
-                          {VERDICT_STYLES[item.verdict].label}
+                        <span className={`${badge} ${VERDICT_STYLES[item.verdict]}`}>
+                          {VERDICT_LABELS[item.verdict]}
                         </span>
                       ) : item.rubricLevel !== null ? (
                         <span className={`${badge} bg-sky-100 text-sky-900`}>
@@ -250,7 +258,14 @@ export function GradeResultCard({
                 ? "Points come from the answer key; ½ credit is noted per question. Range is the score ±2."
                 : "No points on the key, so the rubric levels above set the grade. Range is the score ±2."}
             </p>
-          </details>
+            </details>
+            <CopyTextButton
+              text={whyThisRange}
+              label="Copy"
+              ariaLabel="Copy why this range"
+              className={copyBtnClass}
+            />
+          </div>
         </>
       ) : null}
     </li>

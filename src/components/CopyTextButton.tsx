@@ -7,11 +7,13 @@ export function CopyTextButton({
   label = "Copy",
   emptyLabel = "Nothing to copy",
   className,
+  ariaLabel,
 }: {
   text: string;
   label?: string;
   emptyLabel?: string;
   className?: string;
+  ariaLabel?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const disabled = !text.trim();
@@ -21,6 +23,7 @@ export function CopyTextButton({
       type="button"
       disabled={disabled}
       className={className}
+      aria-label={ariaLabel}
       onClick={async () => {
         if (disabled) return;
         try {
