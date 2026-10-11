@@ -1,12 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 type ConfirmSubmitButtonProps = {
   label: string;
   confirmMessage: string;
   className?: string;
-  children?: ReactNode;
 };
 
 /** Submit button that asks for confirm before posting the parent form. */

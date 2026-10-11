@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import {
   getCurrentTeacher,
   TeacherAuthError,
-} from "@/lib/auth/getCurrentTeacher";
+} from "@/lib/auth/teacher";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { buildLessonPlanExport } from "@/lib/lessons/export";
 import { withHeaderDefaults } from "@/lib/lessons/headerDefaults";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
-import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
+import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periods";
 
 type RouteContext = {
   params: Promise<{ lessonId: string }>;

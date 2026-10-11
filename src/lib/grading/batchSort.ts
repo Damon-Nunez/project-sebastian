@@ -4,12 +4,18 @@
  * Photos use their local OCR text (SCRUM-132), so some sort themselves.
  */
 import type { AssignmentRow, DocumentRow } from "@/lib/db/types";
-import { headerTextForMatch } from "@/lib/grading/headerText";
 import {
   matchHomeworkToRoster,
   type HomeworkMatchCandidate,
 } from "@/lib/grading/matchHomework";
 import type { PeriodWithRoster } from "@/lib/roster/periods";
+
+/** Leading snippet of body text for filename+header matching. */
+export function headerTextForMatch(body: string, maxChars = 1500): string {
+  const trimmed = body.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return trimmed.slice(0, maxChars);
+}
 
 /** Share of the key's content words a paper must contain to file cleanly. */
 export const MIN_KEY_OVERLAP = 0.3;

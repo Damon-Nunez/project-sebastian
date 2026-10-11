@@ -3,14 +3,14 @@ import { notFound } from "next/navigation";
 import { resetPeriodDailyRubricAction } from "@/app/periods/rubricActions";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { PeriodDailyRubricForm } from "@/components/PeriodDailyRubricForm";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   emptyRubricCriteria,
   safeParseRubricCriteria,
 } from "@/lib/rubrics/criteria";
+import { pickDailyWorkEditorSource } from "@/lib/rubrics/defaults";
 import {
   getSectionDailyOverrides,
-  pickSectionDailyEditorSource,
   sectionHasDailyOverride,
 } from "@/lib/rubrics/overrides";
 import { getPeriodForTeacher } from "@/lib/roster/periods";
@@ -39,7 +39,7 @@ export default async function PeriodDailyRubricPage({
     notFound();
   }
 
-  const source = pickSectionDailyEditorSource(overrides);
+  const source = pickDailyWorkEditorSource(overrides);
   const parsed = source
     ? safeParseRubricCriteria(source.criteria)
     : null;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { finishSetupAction, saveWelcomeAction } from "@/app/setup/actions";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   CORE_SUBJECTS,
   coreSubjectOrEmpty,

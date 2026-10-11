@@ -12,7 +12,7 @@ import {
   resetPeriodDailyRubricAction,
 } from "@/app/periods/rubricActions";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   getDailyWorkDefaults,
   pickDailyWorkEditorSource,

@@ -17,7 +17,7 @@ import {
   saveLessonPlanAction,
   uploadLessonImageAction,
 } from "@/app/lessons/actions";
-import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
+import { DeleteLessonDraftButton } from "@/components/ConfirmDeleteDialog";
 import { GroupingsEditor, GroupingsPreview } from "@/components/GroupingsEditor";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { OptionalRoutinesEditor } from "@/components/OptionalRoutinesEditor";
@@ -46,7 +46,7 @@ import {
   emptySectionGroups,
   type SectionGroupsMap,
 } from "@/lib/lessons/sectionGroups";
-import type { PeriodWithRoster } from "@/lib/roster/periodRosters";
+import type { PeriodWithRoster } from "@/lib/roster/periods";
 
 type LessonPlanEditorProps = {
   lessonId: string;
@@ -87,17 +87,6 @@ function statusForText(initial: string, current: string): FieldStatus {
   if (!init) return "edited";
   if (cur === init) return "from-upload";
   return "edited";
-}
-
-function findExtra(
-  content: LessonPlanContent,
-  label: string,
-): { index: number; body: string } | null {
-  const index = content.extras.findIndex(
-    (e) => e.label.toLowerCase() === label.toLowerCase(),
-  );
-  if (index < 0) return null;
-  return { index, body: content.extras[index]!.body };
 }
 
 function parseStandardsCodes(raw: string): string[] {
@@ -618,18 +607,7 @@ export function LessonPlanEditor({
   const worksheetImages = imagesForSection(content, "worksheets");
   const anchorChartImages = imagesForSection(content, "anchorCharts");
 
-  const learningTargets = findExtra(content, "Learning Targets");
-  const homework = findExtra(content, "Homework");
-  const initialTargets = findExtra(initialSnapshot, "Learning Targets");
-  const initialHomework = findExtra(initialSnapshot, "Homework");
-
-  const otherExtras = content.extras
-    .map((extra, index) => ({ extra, index }))
-    .filter(
-      ({ extra }) =>
-        extra.label.toLowerCase() !== "learning targets" &&
-        extra.label.toLowerCase() !== "homework",
-    );
+  const otherExtras = content.extras.map((extra, index) => ({ extra, index }));
 
   const standardsCodes = parseStandardsCodes(content.standards);
   const workBodiesFilled = content.workTimes.some((w) => normalize(w.body));
@@ -642,8 +620,8 @@ export function LessonPlanEditor({
     {
       label: "Learning Targets",
       status: statusForText(
-        initialTargets?.body ?? "",
-        learningTargets?.body ?? "",
+        initialSnapshot.learningTargets.body,
+        content.learningTargets.body,
       ),
     },
     {
@@ -683,8 +661,8 @@ export function LessonPlanEditor({
     {
       label: "Homework",
       status: statusForText(
-        initialHomework?.body ?? "",
-        homework?.body ?? "",
+        initialSnapshot.homework.body,
+        content.homework.body,
       ),
     },
     {
@@ -892,11 +870,11 @@ export function LessonPlanEditor({
 
         <PreviewSection
           title="Learning Targets"
-          empty={!normalize(learningTargets?.body ?? "")}
+          empty={!normalize(content.learningTargets.body)}
           images={previewImages("learningTargets")}
           links={previewLinks("learningTargets")}
         >
-          {learningTargets?.body}
+          {content.learningTargets.body}
         </PreviewSection>
 
         <PreviewSection
@@ -982,11 +960,11 @@ export function LessonPlanEditor({
 
         <PreviewSection
           title="Homework"
-          empty={!normalize(homework?.body ?? "")}
+          empty={!normalize(content.homework.body)}
           images={previewImages("homework")}
           links={previewLinks("homework")}
         >
-          {homework?.body}
+          {content.homework.body}
         </PreviewSection>
 
         <DifferentiationPreview />
@@ -1191,21 +1169,24 @@ export function LessonPlanEditor({
         <FieldHeader
           title="Learning Targets"
           status={statusForText(
-            initialTargets?.body ?? "",
-            learningTargets?.body ?? "",
+            initialSnapshot.learningTargets.body,
+            content.learningTargets.body,
           )}
         />
-        {learningTargets ? (
-          <textarea
-            className={textareaClass}
-            value={learningTargets.body}
-            onChange={(e) => setExtraBody(learningTargets.index, e.target.value)}
-          />
-        ) : (
-          <p className="text-sm text-slate-500">
-            None detected from this upload.
-          </p>
-        )}
+        <textarea
+          className={textareaClass}
+          value={content.learningTargets.body}
+          onChange={(e) =>
+            setContent((prev) => ({
+              ...prev,
+              learningTargets: {
+                ...prev.learningTargets,
+                body: e.target.value,
+              },
+            }))
+          }
+          placeholder="I can…"
+        />
       </div>
 
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1516,22 +1497,21 @@ export function LessonPlanEditor({
         <FieldHeader
           title="Homework"
           status={statusForText(
-            initialHomework?.body ?? "",
-            homework?.body ?? "",
+            initialSnapshot.homework.body,
+            content.homework.body,
           )}
           hint="Starting text from the framework — adjust as needed"
         />
-        {homework ? (
-          <textarea
-            className={textareaClass}
-            value={homework.body}
-            onChange={(e) => setExtraBody(homework.index, e.target.value)}
-          />
-        ) : (
-          <p className="text-sm text-slate-500">
-            None detected from this upload.
-          </p>
-        )}
+        <textarea
+          className={textareaClass}
+          value={content.homework.body}
+          onChange={(e) =>
+            setContent((prev) => ({
+              ...prev,
+              homework: { ...prev.homework, body: e.target.value },
+            }))
+          }
+        />
       </div>
 
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

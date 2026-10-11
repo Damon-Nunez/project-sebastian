@@ -23,10 +23,8 @@ import {
   type HomeworkFormat,
   type VisionPage,
 } from "./studentWorkFiles";
+import { jpegBase64ForModel, normalizeStoredImage } from "@/lib/images/jpeg";
 import { prepareVisionPages, renderPdfPages } from "./vision";
-
-/** Long edge for stored photos — enough for vision grading, small enough to stay cheap. */
-const MAX_IMAGE_EDGE_PX = 2000;
 
 export { MAX_HOMEWORK_BYTES };
 
@@ -88,34 +86,6 @@ export async function createStudentWorkUploadTarget(input: {
   return { storagePath, token: data.token };
 }
 
-export async function normalizeHomeworkImage(
-  bytes: Buffer,
-  format: HomeworkFormat,
-): Promise<Buffer> {
-  let input = bytes;
-  if (format === "heic") {
-    const { default: convertHeic } = await import("heic-convert");
-    const jpeg = await convertHeic({
-      buffer: bytes as unknown as ArrayBufferLike,
-      format: "JPEG",
-      quality: 0.9,
-    });
-    input = Buffer.from(jpeg);
-  }
-
-  const { default: sharp } = await import("sharp");
-  return sharp(input)
-    .rotate()
-    .resize({
-      width: MAX_IMAGE_EDGE_PX,
-      height: MAX_IMAGE_EDGE_PX,
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .jpeg({ quality: 85 })
-    .toBuffer();
-}
-
 type PreparedStudentWork = {
   storagePath: string;
   bodyText: string | null;
@@ -133,7 +103,7 @@ async function prepareStoredStudentWork(input: {
   const roster = () => listStudentsForTeacher(input.teacherId);
 
   if (isImageFormat(input.format)) {
-    const jpeg = await normalizeHomeworkImage(input.bytes, input.format);
+    const jpeg = await normalizeStoredImage(input.bytes, input.format);
     const storagePath = jpegPathFor(input.storagePath);
     const { error } = await admin.storage
       .from(STUDENT_WORK_BUCKET)
@@ -339,7 +309,7 @@ export async function extractStoredDocumentText(input: {
     const bytes = Buffer.from(await blob.arrayBuffer());
     if (isImageFormat(format)) {
       const { ocrJpegToText } = await import("./vision");
-      const jpeg = await normalizeHomeworkImage(bytes, format);
+      const jpeg = await normalizeStoredImage(bytes, format);
       // Prefer a normalized JPEG path so replace/clear cleanup stays simple.
       const jpegPath = jpegPathFor(input.storagePath);
       if (jpegPath !== input.storagePath) {
@@ -370,8 +340,6 @@ export async function extractStoredDocumentText(input: {
     throw extractError;
   }
 }
-
-const MAX_REFERENCE_AI_EDGE_PX = 1568;
 
 export type IngestedReference = {
   text: string;
@@ -426,7 +394,7 @@ export async function ingestAssignmentReferenceFiles(input: {
     const bytes = Buffer.from(await blob.arrayBuffer());
 
     if (isImageFormat(format)) {
-      const jpeg = await normalizeHomeworkImage(bytes, format);
+      const jpeg = await normalizeStoredImage(bytes, format);
       const jpegPath = jpegPathFor(file.storagePath);
       const { error: upError } = await admin.storage
         .from(STUDENT_WORK_BUCKET)
@@ -459,24 +427,9 @@ export async function ingestAssignmentReferenceFiles(input: {
   let source: "vision" | "extract";
 
   if (imagePages.length > 0) {
-    const { default: sharp } = await import("sharp");
     const { parseAnswerKeyFromImages } = await import("./parseReferenceLlm");
     const images = await Promise.all(
-      imagePages.map(async (page) => {
-        const resized = await sharp(page.jpeg!)
-          .resize({
-            width: MAX_REFERENCE_AI_EDGE_PX,
-            height: MAX_REFERENCE_AI_EDGE_PX,
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: 85 })
-          .toBuffer();
-        return {
-          mediaType: "image/jpeg" as const,
-          base64: resized.toString("base64"),
-        };
-      }),
+      imagePages.map((page) => jpegBase64ForModel(page.jpeg!)),
     );
     text = await parseAnswerKeyFromImages({
       teacherId: input.teacherId,

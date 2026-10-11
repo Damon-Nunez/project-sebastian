@@ -12,7 +12,7 @@ import { stdin as input, stdout as output } from "node:process";
 import {
   matchStudentFromDocument,
   prepareTextForAi,
-  rehydratePreparedAiText,
+  rehydrate,
   type RosterStudent,
 } from "../src/lib/sanitizer/index";
 
@@ -70,7 +70,7 @@ function runDemo(opts: {
   console.log(prepared.sanitizedText);
 
   printDivider("Rehydrated (what teacher would see)");
-  console.log(rehydratePreparedAiText(prepared.sanitizedText, prepared.map));
+  console.log(rehydrate(prepared.sanitizedText, prepared.map));
 
   printDivider("Token map");
   for (const entry of prepared.map.entries) {

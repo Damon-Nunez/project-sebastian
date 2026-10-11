@@ -13,15 +13,17 @@ import {
   type VisionPage,
 } from "./studentWorkFiles";
 import {
+  JPEG_QUALITY,
+  jpegEdgeResize,
+  STORED_IMAGE_EDGE_PX,
+} from "@/lib/images/jpeg";
+import {
   maskBoxesForPage,
   rosterMaskTokens,
   type MaskBox,
   type OcrWord,
 } from "./visionMask";
 
-const MAX_IMAGE_EDGE_PX = 2000;
-/** Claude downsizes past this anyway; sending smaller keeps requests light. */
-const MAX_AI_IMAGE_EDGE_PX = 1568;
 const PDF_RENDER_WIDTH_PX = 1700;
 
 const OCR_LANG_PATH = path.join(
@@ -89,7 +91,7 @@ async function drawMask(jpeg: Buffer, boxes: MaskBox[]): Promise<Buffer> {
   );
   return sharp(jpeg)
     .composite([{ input: overlay, top: 0, left: 0 }])
-    .jpeg({ quality: 85 })
+    .jpeg({ quality: JPEG_QUALITY })
     .toBuffer();
 }
 
@@ -111,13 +113,8 @@ export async function renderPdfPages(bytes: Buffer): Promise<Buffer[]> {
       result.pages.map((page) =>
         sharp(Buffer.from(page.data))
           .flatten({ background: "#fff" })
-          .resize({
-            width: MAX_IMAGE_EDGE_PX,
-            height: MAX_IMAGE_EDGE_PX,
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: 85 })
+          .resize(jpegEdgeResize(STORED_IMAGE_EDGE_PX))
+          .jpeg({ quality: JPEG_QUALITY })
           .toBuffer(),
       ),
     );
@@ -237,22 +234,11 @@ export type MaskedPageImage = {
 };
 
 export async function loadMaskedPages(pages: VisionPage[]): Promise<MaskedPageImage[]> {
-  const { default: sharp } = await import("sharp");
+  const { jpegBase64ForModel } = await import("@/lib/images/jpeg");
   return Promise.all(
     pages.map(async (page) => {
-      const jpeg = await sharp(await downloadImage(page.maskedPath))
-        .resize({
-          width: MAX_AI_IMAGE_EDGE_PX,
-          height: MAX_AI_IMAGE_EDGE_PX,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-      return {
-        mediaType: "image/jpeg",
-        base64: jpeg.toString("base64"),
-      } as MaskedPageImage;
+      const image = await jpegBase64ForModel(await downloadImage(page.maskedPath));
+      return image as MaskedPageImage;
     }),
   );
 }

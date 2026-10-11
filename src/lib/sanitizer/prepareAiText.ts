@@ -1,11 +1,11 @@
-import { buildNameTokenMap, redact, rehydrate } from "./redact";
+import { buildNameTokenMap, redact } from "./redact";
 import { assertSanitizedForAi } from "./verify";
 import type { NameTokenMap, RosterStudent } from "./types";
 
 export type PreparedAiText = {
   /** Safe to send to an external AI — roster names replaced with placeholders. */
   sanitizedText: string;
-  /** Keep local; use rehydratePreparedAiText for teacher-facing display. */
+  /** Keep local; use rehydrate for teacher-facing display. */
   map: NameTokenMap;
 };
 
@@ -25,12 +25,4 @@ export function prepareTextForAi(
   const sanitizedText = redact(text, map);
   assertSanitizedForAi(sanitizedText, map);
   return { sanitizedText, map };
-}
-
-/** @deprecated Use `rehydrate` from @/lib/sanitizer directly. */
-export function rehydratePreparedAiText(
-  text: string,
-  map: NameTokenMap,
-): string {
-  return rehydrate(text, map);
 }

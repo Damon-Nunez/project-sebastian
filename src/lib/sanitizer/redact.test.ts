@@ -10,7 +10,6 @@ import {
   SanitizerVerificationError,
   tokenForStudentId,
 } from "./index";
-import { rehydratePreparedAiText } from "./prepareAiText";
 import { sanitizeForAi, SHARED_NAME_TOKEN } from "./redact";
 import type { RosterStudent } from "./types";
 
@@ -261,7 +260,7 @@ describe("sanitizeForAi / prepareTextForAi", () => {
     expect(prepared.sanitizedText).toBe(
       `Grade ${tokenForStudentId(jordan.id)}'s short response.`,
     );
-    expect(rehydratePreparedAiText(prepared.sanitizedText, prepared.map)).toBe(
+    expect(rehydrate(prepared.sanitizedText, prepared.map)).toBe(
       "Grade Jordan Lee's short response.",
     );
   });
@@ -390,7 +389,7 @@ describe("realistic fake-name classroom batch", () => {
       expect(sanitizedText).toContain(tokenForStudentId(student.id));
     }
 
-    expect(rehydratePreparedAiText(sanitizedText, map)).toBe(prompt);
+    expect(rehydrate(sanitizedText, map)).toBe(prompt);
   });
 
   it("matches Kiddom-style Last_First filenames", () => {

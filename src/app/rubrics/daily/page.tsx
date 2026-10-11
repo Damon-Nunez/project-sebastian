@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { DailyRubricForm } from "@/components/DailyRubricForm";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   emptyRubricCriteria,
   safeParseRubricCriteria,

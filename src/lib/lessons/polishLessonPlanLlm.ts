@@ -42,6 +42,7 @@ Voice & shape (match filled-in classroom plans):
 - Standards: keep codes / short focus lines — do not paste long standard prose.
 - Vocabulary: readable lines (term — gloss), bullet-friendly.
 - Entrance ticket: student-facing prompt only.
+- learningTargets and homework: polish the existing text in place.
 - Preserve YouTube/resource URLs and any http(s) links already in the text.
 
 Hard rules:

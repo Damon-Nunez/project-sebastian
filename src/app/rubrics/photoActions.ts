@@ -1,6 +1,6 @@
 "use server";
 
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { deleteStoredStudentWorkFiles } from "@/lib/grading/upload";
 import { parseTeacherStoragePath } from "@/lib/grading/studentWorkFiles";
 import { loadRubricPhotoImages, RubricPhotoReadError } from "@/lib/rubrics/loadRubricPhotoImages";

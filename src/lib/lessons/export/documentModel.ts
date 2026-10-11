@@ -1,7 +1,8 @@
-import type {
-  LessonPlanContent,
-  LessonPlanImage,
-  LessonPlanLink,
+import {
+  promoteKnownSectionExtras,
+  type LessonPlanContent,
+  type LessonPlanImage,
+  type LessonPlanLink,
 } from "../content";
 import {
   STANDARD_CLASSWORK_RUBRIC,
@@ -159,18 +160,6 @@ export function formatLessonPlanExportFilename(
   return `${safe}.docx`;
 }
 
-function isLearningTargetsExtra(label: string): boolean {
-  return label.trim().toLowerCase() === "learning targets";
-}
-
-/** Learning Targets live in extras until they become a first-class field. */
-function learningTargetsBody(content: LessonPlanContent): string {
-  const block = content.extras.find((extra) =>
-    isLearningTargetsExtra(extra.label),
-  );
-  return trimOrEmpty(block?.body ?? "");
-}
-
 function standardRubricImageRef(): ExportImageRef {
   return {
     id: STANDARD_CLASSWORK_RUBRIC_IMAGE.id,
@@ -191,6 +180,7 @@ export function buildLessonPlanExportDocument(
   labels: LessonPlanExportLabels = {},
   options: { groupings?: ExportGroupingsTable | null } = {},
 ): LessonPlanExportDocument {
+  content = promoteKnownSectionExtras(content);
   const title = formatLessonPlanExportTitle(labels);
   const subtitle = content.lessonDate
     ? `Date: ${content.lessonDate}`
@@ -242,7 +232,7 @@ export function buildLessonPlanExportDocument(
   pushSection(
     sections,
     "Learning Targets",
-    learningTargetsBody(content),
+    content.learningTargets.body,
     attachmentsForSection(content, "learningTargets"),
   );
   pushSection(
@@ -295,10 +285,14 @@ export function buildLessonPlanExportDocument(
     content.closing.body,
     attachmentsForSection(content, "closing"),
   );
+  pushSection(
+    sections,
+    "Homework",
+    content.homework.body,
+    attachmentsForSection(content, "homework"),
+  );
 
   for (const [index, block] of content.extras.entries()) {
-    // Already exported as its own "Learning Targets" section above.
-    if (isLearningTargetsExtra(block.label)) continue;
     pushSection(
       sections,
       `${block.label || `Extra ${index + 1}`}${minutesSuffix(block.minutes)}`,
@@ -315,24 +309,18 @@ export function buildLessonPlanExportDocument(
     "materials",
     "opening",
     "closing",
+    "homework",
     ...content.workTimes.map((block) => `workTime:${block.key}`),
   ]);
-  const extraSectionKeys = [
-    "general",
-    "homework",
-    "worksheets",
-    "anchorCharts",
-  ] as const;
+  const extraSectionKeys = ["general", "worksheets", "anchorCharts"] as const;
   for (const key of extraSectionKeys) {
     const attachments = attachmentsForSection(content, key);
     const heading =
       key === "general"
         ? "General resources"
-        : key === "homework"
-          ? "Homework"
-          : key === "worksheets"
-            ? "Worksheets"
-            : "Anchor charts";
+        : key === "worksheets"
+          ? "Worksheets"
+          : "Anchor charts";
     pushSection(sections, heading, "", attachments);
   }
 

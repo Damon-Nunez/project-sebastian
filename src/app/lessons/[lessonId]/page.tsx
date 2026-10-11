@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LessonPlanEditor } from "@/components/LessonPlanEditor";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { parseLessonPlanContent } from "@/lib/lessons/content";
 import { lessonErrorMessage } from "@/lib/lessons/errors";
 import { withHeaderDefaults } from "@/lib/lessons/headerDefaults";
@@ -9,7 +9,7 @@ import { signLessonPlanImages } from "@/lib/lessons/images";
 import { parseOptionalRoutines } from "@/lib/lessons/optionalRoutines";
 import { getLessonPlanForTeacher } from "@/lib/lessons/plans";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
-import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
+import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periods";
 
 type LessonPageProps = {
   params: Promise<{ lessonId: string }>;

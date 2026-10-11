@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { deleteEssayRubricAction } from "@/app/rubrics/essayActions";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { EssayRubricForm } from "@/components/EssayRubricForm";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   emptyRubricCriteria,
   safeParseRubricCriteria,

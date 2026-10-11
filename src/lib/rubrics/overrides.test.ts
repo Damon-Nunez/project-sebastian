@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  pickSectionDailyEditorSource,
-  sectionHasDailyOverride,
-} from "./overrides";
+import { sectionHasDailyOverride } from "./overrides";
 import type { RubricRow } from "@/lib/db/types";
 
 function stub(
@@ -31,13 +28,5 @@ describe("section daily overrides", () => {
     expect(
       sectionHasDailyOverride({ hw: null, shortResponse: null }),
     ).toBe(false);
-  });
-
-  it("prefers hw row as editor source", () => {
-    const hw = stub({ id: "hw", kind: "hw" });
-    const sr = stub({ id: "sr", kind: "short_response" });
-    expect(pickSectionDailyEditorSource({ hw, shortResponse: sr })?.id).toBe(
-      "hw",
-    );
   });
 });

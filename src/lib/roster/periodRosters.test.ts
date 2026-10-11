@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPeriodsWithRosters } from "./periodRosters";
+import { buildPeriodsWithRosters } from "./periods";
 
 describe("buildPeriodsWithRosters", () => {
   it("groups students under matching periods and keeps period order", () => {

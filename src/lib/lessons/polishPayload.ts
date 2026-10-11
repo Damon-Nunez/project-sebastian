@@ -13,6 +13,8 @@ export const polishFieldsSchema = z.object({
   vocabulary: z.string(),
   entranceTicket: z.string(),
   materials: z.string(),
+  learningTargets: z.string(),
+  homework: z.string(),
   opening: z.object({
     body: z.string(),
     minutes: z.number().int().min(0).nullable(),
@@ -46,6 +48,8 @@ export const POLISH_FIELDS_JSON_SHAPE = `{
   "vocabulary": string,
   "entranceTicket": string,
   "materials": string,
+  "learningTargets": string,
+  "homework": string,
   "opening": { "body": string, "minutes": number | null },
   "closing": { "body": string, "minutes": number | null },
   "workTimes": [ { "key": string, "label": string, "minutes": number | null, "body": string } ],
@@ -60,6 +64,8 @@ export function extractPolishFields(content: LessonPlanContent): PolishFields {
     vocabulary: content.vocabulary,
     entranceTicket: content.entranceTicket,
     materials: content.materials,
+    learningTargets: content.learningTargets.body,
+    homework: content.homework.body,
     opening: {
       body: content.opening.body,
       minutes: content.opening.minutes,
@@ -101,6 +107,14 @@ export function applyPolishFields(
     vocabulary: polished.vocabulary,
     entranceTicket: polished.entranceTicket,
     materials: polished.materials,
+    learningTargets: {
+      ...content.learningTargets,
+      body: polished.learningTargets,
+    },
+    homework: {
+      ...content.homework,
+      body: polished.homework,
+    },
     opening: {
       ...content.opening,
       body: polished.opening.body,
@@ -147,6 +161,8 @@ export function rehydratePolishFields(
     vocabulary: rehydrate(fields.vocabulary),
     entranceTicket: rehydrate(fields.entranceTicket),
     materials: rehydrate(fields.materials),
+    learningTargets: rehydrate(fields.learningTargets),
+    homework: rehydrate(fields.homework),
     opening: {
       body: rehydrate(fields.opening.body),
       minutes: fields.opening.minutes,

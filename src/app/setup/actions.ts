@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { isCoreSubject, isGradeBand, isHonorific } from "@/lib/auth/teacherHeader";
 import { formString } from "@/lib/actionHelpers";
 import { normalizeRequiredName } from "@/lib/roster/validate";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isEmailAllowed, parseAllowlist } from "@/lib/auth/allowlist";
 import { persistTeacherGoogleTokensFromSession } from "@/lib/auth/googleDrive";
-import { syncTeacherFromAuthUser } from "@/lib/auth/syncTeacher";
+import { syncTeacherFromAuthUser } from "@/lib/auth/teacher";
 import { createSessionClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EssayRubricForm } from "@/components/EssayRubricForm";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { emptyRubricCriteria } from "@/lib/rubrics/criteria";
 import { getUnitForTeacher } from "@/lib/units/units";
 

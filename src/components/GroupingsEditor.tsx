@@ -13,7 +13,7 @@ import {
 import type {
   PeriodRosterStudent,
   PeriodWithRoster,
-} from "@/lib/roster/periodRosters";
+} from "@/lib/roster/periods";
 
 const labelClass =
   "text-xs font-medium uppercase tracking-wide text-slate-500";

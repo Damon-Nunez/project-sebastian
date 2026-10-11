@@ -20,6 +20,8 @@ type FieldKind =
   | "opening"
   | "closing"
   | "workTime"
+  | "learningTargets"
+  | "homework"
   | "extra";
 
 type HeadingMatch = {
@@ -32,7 +34,7 @@ type HeadingMatch = {
 
 type OpenSection =
   | { kind: "standards" | "agenda" | "materials" }
-  | { kind: "opening" | "closing" }
+  | { kind: "opening" | "closing" | "learningTargets" | "homework" }
   | { kind: "workTime"; workKey: string }
   | { kind: "extra" };
 
@@ -128,11 +130,15 @@ export function matchFrameworkHeading(rawLine: string): HeadingMatch | null {
     };
   }
 
-  if (
-    /^(lesson\s+overview|lesson\s+summary|daily\s+learning\s+targets|learning\s+targets|homework)\s*:?\s*$/i.test(
-      line,
-    )
-  ) {
+  if (/^(daily\s+)?learning\s+targets\s*:?\s*$/i.test(line)) {
+    return { kind: "learningTargets", label: "Learning Targets" };
+  }
+
+  if (/^homework\s*:?\s*$/i.test(line)) {
+    return { kind: "homework", label: "Homework" };
+  }
+
+  if (/^(lesson\s+overview|lesson\s+summary)\s*:?\s*$/i.test(line)) {
     return { kind: "extra", label: line.replace(/:$/, "") };
   }
 
@@ -170,6 +176,8 @@ function isAgendaOutlineHeading(heading: HeadingMatch): boolean {
     heading.kind === "opening" ||
     heading.kind === "workTime" ||
     heading.kind === "closing" ||
+    heading.kind === "learningTargets" ||
+    heading.kind === "homework" ||
     heading.kind === "extra"
   );
 }
@@ -251,6 +259,16 @@ export function parseFrameworkText(text: string): LessonPlanContent {
         open = { kind: "materials" };
         continue;
       }
+      if (heading.kind === "learningTargets") {
+        content.learningTargets.label = heading.label;
+        open = { kind: "learningTargets" };
+        continue;
+      }
+      if (heading.kind === "homework") {
+        content.homework.label = heading.label;
+        open = { kind: "homework" };
+        continue;
+      }
       if (heading.kind === "extra") {
         content.extras.push({
           label: heading.label,
@@ -279,6 +297,13 @@ export function parseFrameworkText(text: string): LessonPlanContent {
     } else if (open.kind === "workTime") {
       const block = workByKey.get(open.workKey);
       if (block) block.body = appendLine(block.body, trimmed);
+    } else if (open.kind === "learningTargets") {
+      content.learningTargets.body = appendLine(
+        content.learningTargets.body,
+        trimmed,
+      );
+    } else if (open.kind === "homework") {
+      content.homework.body = appendLine(content.homework.body, trimmed);
     } else if (open.kind === "extra") {
       const last = content.extras[content.extras.length - 1];
       if (last) last.body = appendLine(last.body, trimmed);
@@ -296,6 +321,14 @@ export function parseFrameworkText(text: string): LessonPlanContent {
   content.closing = {
     ...content.closing,
     ...withBodyVariants(content.closing.body),
+  };
+  content.learningTargets = {
+    ...content.learningTargets,
+    ...withBodyVariants(content.learningTargets.body),
+  };
+  content.homework = {
+    ...content.homework,
+    ...withBodyVariants(content.homework.body),
   };
   content.extras = content.extras.map((e) => ({
     ...e,

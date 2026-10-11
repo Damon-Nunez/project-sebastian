@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  dailyWorkKindsToSync,
-  pickDailyWorkEditorSource,
-} from "./defaults";
+import { pickDailyWorkEditorSource } from "./defaults";
 import type { RubricRow } from "@/lib/db/types";
 
 function stubRubric(partial: Partial<RubricRow> & Pick<RubricRow, "id" | "kind">): RubricRow {
@@ -17,12 +14,6 @@ function stubRubric(partial: Partial<RubricRow> & Pick<RubricRow, "id" | "kind">
     ...partial,
   };
 }
-
-describe("dailyWorkKindsToSync", () => {
-  it("keeps hw and short_response paired for Approach B", () => {
-    expect(dailyWorkKindsToSync()).toEqual(["hw", "short_response"]);
-  });
-});
 
 describe("pickDailyWorkEditorSource", () => {
   it("prefers the hw row when both exist", () => {

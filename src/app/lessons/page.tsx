@@ -1,6 +1,6 @@
-import { DeleteLessonDraftButton } from "@/components/DeleteLessonDraftButton";
+import { DeleteLessonDraftButton } from "@/components/ConfirmDeleteDialog";
 import { FrameworkUploadForm } from "@/components/FrameworkUploadForm";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { lessonErrorMessage } from "@/lib/lessons/errors";
 import { listLessonPlansForTeacher } from "@/lib/lessons/plans";
 import type { LessonPlanRow } from "@/lib/db/types";

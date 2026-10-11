@@ -7,10 +7,10 @@ import {
 } from "@/app/grading/batchActions";
 import { AssignmentReferenceForm } from "@/components/AssignmentReferenceForm";
 import { BatchUploadDropzone } from "@/components/BatchUploadDropzone";
-import { DeleteAssignmentButton } from "@/components/DeleteAssignmentButton";
+import { DeleteAssignmentButton } from "@/components/ConfirmDeleteDialog";
 import { GradingRunner } from "@/components/GradingRunner";
 import { ReadyWorkList } from "@/components/ReadyWorkList";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   getAssignmentForTeacher,
   listPeriodFoldersForAssignment,

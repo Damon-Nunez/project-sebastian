@@ -112,7 +112,6 @@ export function formatVocabularyBullets(raw: string): string {
 
 /**
  * Map LLM buckets into LessonPlanContent for the form populater.
- * Learning Targets + Homework land in extras until first-class schema fields.
  * Edited body starts as a copy of Original; Simplified is its own sibling.
  */
 export function bucketsToLessonPlanContent(
@@ -134,22 +133,6 @@ export function bucketsToLessonPlanContent(
           };
         });
 
-  const extras: LessonPlanContent["extras"] = [];
-  if (buckets.learningTargets.trim()) {
-    extras.push({
-      label: "Learning Targets",
-      ...withBodyVariants(buckets.learningTargets),
-      minutes: null,
-    });
-  }
-  if (buckets.homework.trim()) {
-    extras.push({
-      label: "Homework",
-      ...withBodyVariants(buckets.homework),
-      minutes: null,
-    });
-  }
-
   const openingVariants = withBodyVariants(
     buckets.opening.body,
     buckets.opening.bodySimplified,
@@ -169,6 +152,16 @@ export function bucketsToLessonPlanContent(
     agenda: buckets.agenda.trim(),
     vocabulary: formatVocabularyBullets(buckets.vocabulary),
     entranceTicket: buckets.entranceTicket.trim(),
+    learningTargets: {
+      label: "Learning Targets",
+      minutes: null,
+      ...withBodyVariants(buckets.learningTargets),
+    },
+    homework: {
+      label: "Homework",
+      minutes: null,
+      ...withBodyVariants(buckets.homework),
+    },
     materials: buckets.materials.trim(),
     opening: {
       label: buckets.opening.label.trim() || "Opening",
@@ -182,6 +175,6 @@ export function bucketsToLessonPlanContent(
     },
     workTimes,
     workTimesReservoir: [],
-    extras,
+    extras: [],
   };
 }

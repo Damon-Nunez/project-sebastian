@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createUnitAction } from "@/app/units/actions";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { listUnitsForTeacher } from "@/lib/units/units";
 
 export default async function UnitsPage() {

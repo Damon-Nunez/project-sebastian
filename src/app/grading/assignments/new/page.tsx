@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createAssignmentAction } from "@/app/grading/assignmentActions";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { gradingErrorMessage } from "@/lib/grading/errors";
 import { listUnitsForTeacher } from "@/lib/units/units";
 

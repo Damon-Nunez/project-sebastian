@@ -5,7 +5,7 @@ import {
   updateUnitAction,
 } from "@/app/units/actions";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   isRubricCriteriaComplete,
   safeParseRubricCriteria,

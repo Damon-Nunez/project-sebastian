@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import {
   EmptyFrameworkTextError,
   UnsupportedFrameworkFormatError,
@@ -22,7 +22,7 @@ import { uploadLessonPlanDocxToDrive } from "@/lib/lessons/driveUpload";
 import { polishAndSaveLessonPlan } from "@/lib/lessons/polishAndSaveLessonPlan";
 import { parseOptionalRoutines } from "@/lib/lessons/optionalRoutines";
 import { parseSectionGroups } from "@/lib/lessons/sectionGroups";
-import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periodRosters";
+import { listPeriodsWithRostersForTeacher } from "@/lib/roster/periods";
 import {
   isAllowedLessonImageMime,
   MAX_LESSON_IMAGE_BYTES,

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { listPeriodsForTeacher } from "@/lib/roster/periods";
 import { createPeriodAction } from "@/app/periods/actions";
 

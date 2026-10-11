@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { DocumentRow } from "@/lib/db/types";
 import type { PeriodWithRoster } from "@/lib/roster/periods";
-import { keyWordOverlap, orderPagesForCombine, sortUnfiledWork } from "./batchSort";
+import {
+  headerTextForMatch,
+  keyWordOverlap,
+  orderPagesForCombine,
+  sortUnfiledWork,
+} from "./batchSort";
 
 const KEY = `1. Why does Esperanza feel ashamed of the house on Mango Street?
 2. Describe the neighborhood and the family's previous apartment.
@@ -94,6 +99,21 @@ describe("orderPagesForCombine", () => {
       { id: "b1", original_filename: "scan.jpg", created_at: "2026-10-01T00:00:04Z" },
     ];
     expect(orderPagesForCombine(pages).map((p) => p.id)).toEqual(["a", "c", "b1", "b2"]);
+  });
+});
+
+describe("headerTextForMatch", () => {
+  it("returns the full body when short", () => {
+    expect(headerTextForMatch("Damon Nunez\nPeriod 3")).toBe(
+      "Damon Nunez\nPeriod 3",
+    );
+  });
+
+  it("trims and caps long bodies", () => {
+    const body = `Name: Damon\n${"x".repeat(2000)}`;
+    const header = headerTextForMatch(body, 20);
+    expect(header.length).toBe(20);
+    expect(header.startsWith("Name: Damon")).toBe(true);
   });
 });
 

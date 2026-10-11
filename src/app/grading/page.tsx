@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { DeleteAssignmentButton } from "@/components/DeleteAssignmentButton";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { DeleteAssignmentButton } from "@/components/ConfirmDeleteDialog";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { listAssignmentsForTeacher } from "@/lib/grading/assignments";
 import { gradingErrorMessage } from "@/lib/grading/errors";
 import { formatAssignmentFolderTitle } from "@/lib/grading/labels";

@@ -1,12 +1,10 @@
 import type { RubricRow } from "@/lib/db/types";
-import {
-  parseRubricCriteria,
-  type RubricCriteria,
-} from "@/lib/rubrics/criteria";
+import { parseRubricCriteria } from "@/lib/rubrics/criteria";
 import {
   DAILY_WORK_KINDS,
   getDailyWorkDefaults,
   pickDailyWorkEditorSource,
+  upsertDailyKind,
   type DailyWorkKind,
 } from "@/lib/rubrics/defaults";
 import { normalizeRequiredName } from "@/lib/roster/validate";
@@ -52,74 +50,12 @@ export async function getSectionDailyOverrides(input: {
   return { hw, shortResponse };
 }
 
-export function pickSectionDailyEditorSource(overrides: {
-  hw: RubricRow | null;
-  shortResponse: RubricRow | null;
-}): RubricRow | null {
-  return overrides.hw ?? overrides.shortResponse;
-}
-
 /** True when this section has at least one daily-work override row. */
 export function sectionHasDailyOverride(overrides: {
   hw: RubricRow | null;
   shortResponse: RubricRow | null;
 }): boolean {
   return overrides.hw != null || overrides.shortResponse != null;
-}
-
-async function upsertSectionDailyKind(input: {
-  teacherId: string;
-  sectionId: string;
-  kind: DailyWorkKind;
-  name: string;
-  criteria: RubricCriteria;
-  existingId: string | null;
-}): Promise<RubricRow> {
-  const admin = createAdminSupabaseClient();
-  const now = new Date().toISOString();
-  const payload = {
-    teacher_id: input.teacherId,
-    kind: input.kind,
-    name: input.name,
-    criteria: input.criteria,
-    unit_id: null,
-    section_id: input.sectionId,
-    updated_at: now,
-  };
-
-  if (input.existingId) {
-    const { data, error } = await admin
-      .from("rubrics")
-      .update(payload)
-      .eq("teacher_id", input.teacherId)
-      .eq("id", input.existingId)
-      .eq("section_id", input.sectionId)
-      .select(RUBRIC_SELECT)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(
-        `Failed to update section ${input.kind} override: ${error.message}`,
-      );
-    }
-    if (!data) {
-      throw new Error(`Section ${input.kind} override not found`);
-    }
-    return data as RubricRow;
-  }
-
-  const { data, error } = await admin
-    .from("rubrics")
-    .insert(payload)
-    .select(RUBRIC_SELECT)
-    .single();
-
-  if (error) {
-    throw new Error(
-      `Failed to create section ${input.kind} override: ${error.message}`,
-    );
-  }
-  return data as RubricRow;
 }
 
 /**
@@ -156,7 +92,7 @@ export async function ensureSectionDailyOverrides(input: {
     DAILY_WORK_KINDS.map((kind) => {
       const existingId =
         kind === "hw" ? existing.hw?.id ?? null : existing.shortResponse?.id ?? null;
-      return upsertSectionDailyKind({
+      return upsertDailyKind({
         teacherId: input.teacherId,
         sectionId: input.sectionId,
         kind,
@@ -201,7 +137,7 @@ export async function updateSectionDailyOverrides(input: {
     DAILY_WORK_KINDS.map((kind) => {
       const existingId =
         kind === "hw" ? existing.hw?.id ?? null : existing.shortResponse?.id ?? null;
-      return upsertSectionDailyKind({
+      return upsertDailyKind({
         teacherId: input.teacherId,
         sectionId: input.sectionId,
         kind,

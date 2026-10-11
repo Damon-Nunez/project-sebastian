@@ -95,6 +95,22 @@ export const lessonPlanContentSchema = z.object({
    * Distinct from Opening body (teacher routine / interpretation).
    */
   entranceTicket: z.string().default(""),
+  /** "I can…" targets. Promoted out of extras for older drafts on parse. */
+  learningTargets: labeledBlockSchema.default({
+    label: "Learning Targets",
+    body: "",
+    bodyOriginal: "",
+    bodySimplified: "",
+    minutes: null,
+  }),
+  /** Homework assignment text. Promoted out of extras for older drafts on parse. */
+  homework: labeledBlockSchema.default({
+    label: "Homework",
+    body: "",
+    bodyOriginal: "",
+    bodySimplified: "",
+    minutes: null,
+  }),
   materials: z.string(),
   opening: labeledBlockSchema,
   workTimes: z.array(workTimeBlockSchema),
@@ -263,6 +279,8 @@ export function emptyLessonPlanContent(
     agenda: "",
     vocabulary: "",
     entranceTicket: "",
+    learningTargets: emptyLabeledBlock("Learning Targets"),
+    homework: emptyLabeledBlock("Homework"),
     materials: "",
     opening: emptyLabeledBlock("Opening"),
     workTimes: Array.from({ length: workTimeCount }, (_, i) =>
@@ -276,12 +294,66 @@ export function emptyLessonPlanContent(
   };
 }
 
+function blockHasText(block: LabeledBlock): boolean {
+  return Boolean(
+    block.body.trim() ||
+      block.bodyOriginal.trim() ||
+      block.bodySimplified.trim(),
+  );
+}
+
+function isLearningTargetsLabel(label: string): boolean {
+  const normalized = label.trim().toLowerCase().replace(/:$/, "");
+  return (
+    normalized === "learning targets" || normalized === "daily learning targets"
+  );
+}
+
+function isHomeworkLabel(label: string): boolean {
+  return label.trim().toLowerCase().replace(/:$/, "") === "homework";
+}
+
+/**
+ * Older drafts stored Learning Targets and Homework inside extras.
+ * Lift the first text-bearing match into the real fields and drop those extras.
+ */
+export function promoteKnownSectionExtras(
+  content: LessonPlanContent,
+): LessonPlanContent {
+  let learningTargets = { ...content.learningTargets };
+  let homework = { ...content.homework };
+  const extras: LabeledBlock[] = [];
+
+  for (const extra of content.extras) {
+    if (isLearningTargetsLabel(extra.label)) {
+      if (!blockHasText(learningTargets)) {
+        learningTargets = { ...extra, label: "Learning Targets" };
+      }
+      continue;
+    }
+    if (isHomeworkLabel(extra.label)) {
+      if (!blockHasText(homework)) {
+        homework = { ...extra, label: "Homework" };
+      }
+      continue;
+    }
+    extras.push(extra);
+  }
+
+  return { ...content, learningTargets, homework, extras };
+}
+
 export function parseLessonPlanContent(raw: unknown): LessonPlanContent {
-  return lessonPlanContentSchema.parse(raw);
+  return promoteKnownSectionExtras(lessonPlanContentSchema.parse(raw));
 }
 
 export function safeParseLessonPlanContent(raw: unknown) {
-  return lessonPlanContentSchema.safeParse(raw);
+  const result = lessonPlanContentSchema.safeParse(raw);
+  if (!result.success) return result;
+  return {
+    success: true as const,
+    data: promoteKnownSectionExtras(result.data),
+  };
 }
 
 function rekeyWorkTimeBlock(block: WorkTimeBlock, index: number): WorkTimeBlock {

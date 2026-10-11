@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DeleteAssignmentFolderButton } from "@/components/DeleteAssignmentFolderButton";
-import { getCurrentTeacher } from "@/lib/auth/getCurrentTeacher";
+import { DeleteAssignmentFolderButton } from "@/components/ConfirmDeleteDialog";
+import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { gradingErrorMessage } from "@/lib/grading/errors";
 import {
   listGradingSessionsForPeriod,

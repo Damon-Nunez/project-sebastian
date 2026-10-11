@@ -12,11 +12,6 @@ const RUBRIC_SELECT =
 export const DAILY_WORK_KINDS = ["hw", "short_response"] as const;
 export type DailyWorkKind = (typeof DAILY_WORK_KINDS)[number];
 
-/** Pure: both daily kinds share the same payload for Approach B. */
-export function dailyWorkKindsToSync(): DailyWorkKind[] {
-  return [...DAILY_WORK_KINDS];
-}
-
 export async function getDefaultRubricForKind(
   teacherId: string,
   kind: DailyWorkKind,
@@ -62,13 +57,16 @@ export function pickDailyWorkEditorSource(defaults: {
   return defaults.hw ?? defaults.shortResponse;
 }
 
-async function upsertOneDefault(input: {
+/** Insert or update one hw / short_response row. sectionId null is the shared default. */
+export async function upsertDailyKind(input: {
   teacherId: string;
   kind: DailyWorkKind;
   name: string;
   criteria: RubricCriteria;
   existingId: string | null;
+  sectionId?: string | null;
 }): Promise<RubricRow> {
+  const sectionId = input.sectionId ?? null;
   const admin = createAdminSupabaseClient();
   const now = new Date().toISOString();
   const payload = {
@@ -77,24 +75,29 @@ async function upsertOneDefault(input: {
     name: input.name,
     criteria: input.criteria,
     unit_id: null,
-    section_id: null,
+    section_id: sectionId,
     updated_at: now,
   };
+  const label = sectionId ? `section ${input.kind} override` : `${input.kind} rubric`;
 
   if (input.existingId) {
-    const { data, error } = await admin
+    let query = admin
       .from("rubrics")
       .update(payload)
       .eq("teacher_id", input.teacherId)
-      .eq("id", input.existingId)
-      .select(RUBRIC_SELECT)
-      .maybeSingle();
+      .eq("id", input.existingId);
+    if (sectionId) query = query.eq("section_id", sectionId);
+    const { data, error } = await query.select(RUBRIC_SELECT).maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to update ${input.kind} rubric: ${error.message}`);
+      throw new Error(`Failed to update ${label}: ${error.message}`);
     }
     if (!data) {
-      throw new Error(`${input.kind} rubric not found`);
+      throw new Error(
+        sectionId
+          ? `Section ${input.kind} override not found`
+          : `${input.kind} rubric not found`,
+      );
     }
     return data as RubricRow;
   }
@@ -106,7 +109,7 @@ async function upsertOneDefault(input: {
     .single();
 
   if (error) {
-    throw new Error(`Failed to create ${input.kind} rubric: ${error.message}`);
+    throw new Error(`Failed to create ${label}: ${error.message}`);
   }
   return data as RubricRow;
 }
@@ -128,14 +131,14 @@ export async function upsertDailyWorkDefaults(input: {
   const existing = await getDailyWorkDefaults(input.teacherId);
 
   const [hw, shortResponse] = await Promise.all([
-    upsertOneDefault({
+    upsertDailyKind({
       teacherId: input.teacherId,
       kind: "hw",
       name,
       criteria,
       existingId: existing.hw?.id ?? null,
     }),
-    upsertOneDefault({
+    upsertDailyKind({
       teacherId: input.teacherId,
       kind: "short_response",
       name,
