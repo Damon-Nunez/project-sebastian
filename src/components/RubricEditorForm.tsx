@@ -1,20 +1,33 @@
 "use client";
 
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { parseRubricPhotoAction, discardRubricPhotoUploadsAction } from "@/app/rubrics/photoActions";
 import { FileDropzone } from "@/components/FileDropzone";
 import { gradingErrorMessage } from "@/lib/grading/errors";
 import { uploadFileToStudentWork } from "@/lib/grading/uploadClient";
-import {
-  MAX_RUBRIC_PHOTO_PAGES,
-  RUBRIC_PHOTO_ACCEPT,
-} from "@/lib/rubrics/rubricPhotoDraft";
 import {
   emptyRubricCriteria,
   type RubricCategory,
   type RubricCriteria,
   type RubricLevel,
 } from "@/lib/rubrics/criteria";
+import {
+  MAX_RUBRIC_PHOTO_PAGES,
+  RUBRIC_PHOTO_ACCEPT,
+} from "@/lib/rubrics/rubricPhotoDraft";
+import {
+  isRubricEditorDirty,
+  rubricEditorSnapshot,
+  rubricLeaveHref,
+} from "@/lib/rubrics/unsavedRubricLeave";
 
 type RubricEditorFormProps = {
   initialName: string;
@@ -80,19 +93,91 @@ export function RubricEditorForm({
   submitLabel,
   action,
 }: RubricEditorFormProps) {
-  const [name, setName] = useState(initialName);
-  const [criteria, setCriteria] = useState<RubricCriteria>(
-    () =>
+  const router = useRouter();
+  const alertRef = useRef<HTMLDivElement>(null);
+  const allowLeaveRef = useRef(false);
+  const [saved] = useState(() => {
+    const criteria =
       initialCriteria ??
       emptyRubricCriteria({
         categoryNames: ["Category 1", "Category 2", "Category 3"],
-      }),
-  );
+      });
+    return {
+      criteria,
+      snapshot: rubricEditorSnapshot(initialName, criteria),
+    };
+  });
+  const [name, setName] = useState(initialName);
+  const [criteria, setCriteria] = useState<RubricCriteria>(saved.criteria);
+  const [pendingLeave, setPendingLeave] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [showCategoryErrors, setShowCategoryErrors] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoStatus, setPhotoStatus] = useState<string | null>(null);
+  const dirty = isRubricEditorDirty(saved.snapshot, name, criteria);
+
+  useEffect(() => {
+    if (!dirty) return;
+
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (allowLeaveRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    function onClick(event: MouseEvent) {
+      if (allowLeaveRef.current) return;
+      if (event.defaultPrevented || event.button !== 0) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a");
+      if (!anchor) return;
+      const href = rubricLeaveHref({
+        href: anchor.getAttribute("href"),
+        currentUrl: window.location.href,
+        target: anchor.getAttribute("target"),
+        hasDownload: anchor.hasAttribute("download"),
+        modifiedClick:
+          event.metaKey || event.ctrlKey || event.shiftKey || event.altKey,
+      });
+      if (!href) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingLeave(href);
+    }
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) setPendingLeave(null);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!pendingLeave) return;
+    alertRef.current?.scrollIntoView({ block: "center" });
+    alertRef.current?.focus();
+  }, [pendingLeave]);
+
+  function stayOnPage() {
+    setPendingLeave(null);
+  }
+
+  function leaveWithoutSaving() {
+    if (!pendingLeave) return;
+    allowLeaveRef.current = true;
+    if (pendingLeave.startsWith("http")) {
+      window.location.assign(pendingLeave);
+      return;
+    }
+    router.push(pendingLeave);
+  }
 
   const cellMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -264,6 +349,40 @@ export function RubricEditorForm({
       onSubmit={onSubmit}
       className="space-y-8"
     >
+      {dirty ? (
+        <div
+          ref={alertRef}
+          tabIndex={-1}
+          role="alert"
+          className="sticky top-4 z-30 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-950 shadow-sm outline-none"
+        >
+          <p className="font-medium">Unsaved changes</p>
+          <p className="mt-1">
+            These edits stay on this page until you press {submitLabel}.
+            {pendingLeave
+              ? " Leave now and they are discarded."
+              : " Going back before that drops them."}
+          </p>
+          {pendingLeave ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={stayOnPage}
+                className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100"
+              >
+                Stay on this page
+              </button>
+              <button
+                type="button"
+                onClick={leaveWithoutSaving}
+                className="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800"
+              >
+                Leave without saving
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {hiddenFields
         ? Object.entries(hiddenFields).map(([key, value]) => (
             <input key={key} type="hidden" name={key} value={value} />
