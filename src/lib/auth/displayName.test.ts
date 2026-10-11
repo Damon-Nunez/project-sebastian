@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { User } from "@supabase/supabase-js";
 import {
   displayNameFromAuthUser,
+  displayNameToKeep,
   initialsFromDisplayName,
 } from "./displayName";
 
@@ -21,6 +22,14 @@ describe("displayNameFromAuthUser", () => {
 
   it("returns null when missing", () => {
     expect(displayNameFromAuthUser(fakeUser({}))).toBeNull();
+  });
+});
+
+describe("displayNameToKeep", () => {
+  it("keeps a confirmed name and fills from Google only when blank", () => {
+    expect(displayNameToKeep("Ada George", "Ada G")).toBe("Ada George");
+    expect(displayNameToKeep("  ", "Ada George")).toBe("Ada George");
+    expect(displayNameToKeep(null, null)).toBeNull();
   });
 });
 

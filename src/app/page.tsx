@@ -1,67 +1,49 @@
 import Link from "next/link";
 
+const links = [
+  {
+    href: "/lessons",
+    title: "Lessons",
+    body: "Upload a framework and write the plan for class.",
+  },
+  {
+    href: "/grading",
+    title: "Grading",
+    body: "File papers, review ranges, and copy comments out.",
+  },
+  {
+    href: "/periods",
+    title: "Periods",
+    body: "Classes, rosters, and notes for each student.",
+  },
+];
+
 export default function Home() {
   return (
     <section className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Project Sebastian
+          Sebastian
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-          Teacher workload assistant
+          Home
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          You are signed in. Open Lessons to upload a district framework, manage
-          periods, grade homework under class folders, or set up rubrics.
+          Lesson planning and grading for your classes.
         </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/lessons"
-            className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            Open lessons
-          </Link>
-          <Link
-            href="/grading"
-            className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-          >
-            Open grading
-          </Link>
-          <Link
-            href="/periods"
-            className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-          >
-            Set up periods
-          </Link>
-          <Link
-            href="/rubrics"
-            className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-          >
-            Rubrics
-          </Link>
-        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-semibold text-slate-900">Ticket 4 status</h2>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>Create periods (name + optional school year)</li>
-            <li>Roster: full student name + optional notes</li>
-            <li>Teacher-scoped via signed-in profile</li>
-            <li className="font-medium text-emerald-700">
-              Ticket 5 in progress — upload a framework under Lessons
-            </li>
-          </ul>
-        </article>
-        <article className="rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-semibold text-slate-900">Stack (locked)</h2>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>Vercel hosting</li>
-            <li>Supabase Postgres + Auth</li>
-            <li>Claude Sonnet via getAiClient</li>
-          </ul>
-        </article>
+      <div className="grid gap-4 md:grid-cols-3">
+        {links.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300"
+          >
+            <h2 className="text-sm font-semibold text-slate-900">{link.title}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{link.body}</p>
+          </Link>
+        ))}
       </div>
     </section>
   );

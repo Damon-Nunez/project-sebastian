@@ -16,6 +16,15 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
+/** So server components can tell which page is rendering (setup gate). */
+function nextWithPathname(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+}
+
 /** Redirect while preserving cookies written by the Supabase client (refresh/signOut). */
 function redirectWithCookies(url: URL, cookiesToSet: CookieToSet[]) {
   const redirect = NextResponse.redirect(url);
@@ -30,7 +39,7 @@ function redirectWithCookies(url: URL, cookiesToSet: CookieToSet[]) {
  * Used by src/proxy.ts (Next.js 16 proxy convention).
  */
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  let supabaseResponse = nextWithPathname(request);
   let cookiesToSet: CookieToSet[] = [];
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -61,7 +70,7 @@ export async function updateSession(request: NextRequest) {
         nextCookies.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
-        supabaseResponse = NextResponse.next({ request });
+        supabaseResponse = nextWithPathname(request);
         nextCookies.forEach(({ name, value, options }) => {
           supabaseResponse.cookies.set(name, value, options);
         });

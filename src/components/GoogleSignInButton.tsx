@@ -50,7 +50,7 @@ export function GoogleSignInButton({ nextPath = "/" }: GoogleSignInButtonProps) 
         disabled={pending}
         className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Redirecting to Google…" : "Sign in with Google"}
+        {pending ? "Redirecting to Google…" : "Continue with Google"}
       </button>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>

@@ -28,14 +28,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <section className="mx-auto flex max-w-md flex-col gap-6 pt-8">
       <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Project Sebastian
+          Teacher assistant
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-          Teacher sign-in
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">
+          Sebastian
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Sign in with the Google account on the allowlist. Only approved teacher
-          emails can access the workspace.
+          Continue with the Google account your school approved. Only those
+          emails can sign in.
         </p>
 
         {errorMessage ? (

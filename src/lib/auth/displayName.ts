@@ -20,6 +20,19 @@ export function displayNameFromAuthUser(user: User): string | null {
 }
 
 /**
+ * Keep a name the teacher already confirmed. Fill from Google only when blank.
+ */
+export function displayNameToKeep(
+  existing: string | null | undefined,
+  fromGoogle: string | null | undefined,
+): string | null {
+  const kept = (existing ?? "").trim();
+  if (kept) return kept;
+  const incoming = (fromGoogle ?? "").trim();
+  return incoming || null;
+}
+
+/**
  * Initials for avatar: first + last word, or first two letters of one word.
  */
 export function initialsFromDisplayName(

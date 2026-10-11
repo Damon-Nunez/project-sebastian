@@ -4,7 +4,10 @@
  */
 import type { User } from "@supabase/supabase-js";
 import type { TeacherRow } from "@/lib/db/types";
-import { displayNameFromAuthUser } from "@/lib/auth/displayName";
+import {
+  displayNameFromAuthUser,
+  displayNameToKeep,
+} from "@/lib/auth/displayName";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createSessionClient } from "@/lib/supabase/server";
 
@@ -16,7 +19,7 @@ export class TeacherAuthError extends Error {
 }
 
 const TEACHER_SELECT =
-  "id, email, display_name, subject, grade_label, honorific, auth_user_id, api_key_encrypted, usage_tokens, created_at, updated_at";
+  "id, email, display_name, subject, grade_label, honorific, setup_completed_at, auth_user_id, api_key_encrypted, usage_tokens, created_at, updated_at";
 
 /**
  * Resolve the signed-in Auth user → `teachers` row (domain PK).
@@ -71,7 +74,7 @@ export async function syncTeacherFromAuthUser(user: User) {
   // Try matching by auth_user_id first (returning user).
   const { data: byAuth, error: byAuthError } = await supabase
     .from("teachers")
-    .select("id, email, auth_user_id")
+    .select("id, email, auth_user_id, display_name")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -82,7 +85,11 @@ export async function syncTeacherFromAuthUser(user: User) {
   if (byAuth) {
     const { data, error } = await supabase
       .from("teachers")
-      .update({ email, display_name: displayName, updated_at: now })
+      .update({
+        email,
+        display_name: displayNameToKeep(byAuth.display_name, displayName),
+        updated_at: now,
+      })
       .eq("id", byAuth.id)
       .select("id, email, auth_user_id, display_name")
       .single();
@@ -93,7 +100,7 @@ export async function syncTeacherFromAuthUser(user: User) {
   // Try matching by email (pre-linked row or email change).
   const { data: byEmail, error: byEmailError } = await supabase
     .from("teachers")
-    .select("id, email, auth_user_id")
+    .select("id, email, auth_user_id, display_name")
     .eq("email", email)
     .maybeSingle();
 
@@ -104,7 +111,12 @@ export async function syncTeacherFromAuthUser(user: User) {
   if (byEmail) {
     const { data, error } = await supabase
       .from("teachers")
-      .update({ email, display_name: displayName, auth_user_id: user.id, updated_at: now })
+      .update({
+        email,
+        display_name: displayNameToKeep(byEmail.display_name, displayName),
+        auth_user_id: user.id,
+        updated_at: now,
+      })
       .eq("id", byEmail.id)
       .select("id, email, auth_user_id, display_name")
       .single();

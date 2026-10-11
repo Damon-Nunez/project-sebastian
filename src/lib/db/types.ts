@@ -18,6 +18,8 @@ export type TeacherRow = {
   grade_label: string | null;
   /** Explicit Mr / Ms / Mx — never inferred (migration 016). */
   honorific: string | null;
+  /** Set when first-login setup is finished (migration 026). */
+  setup_completed_at: string | null;
   auth_user_id: string | null;
   api_key_encrypted: string | null;
   usage_tokens: number | null;
